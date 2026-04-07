@@ -196,7 +196,7 @@ img { max-width:100%; }
 }
 .ib:hover { border-color:var(--accent); color:var(--accent); }
 .ib .dot { position:absolute; top:6px; right:6px; width:7px; height:7px; background:var(--danger); border-radius:50%; border:2px solid var(--bg); }
-
+#menuBtn { display:none; }
 .theme-btn {
   background:var(--surface); border:1px solid var(--border); color:var(--text2);
   width:36px; height:36px; border-radius:var(--radius-sm);
@@ -942,7 +942,7 @@ body.compact .panel-body { padding:0.75rem 1rem; }
 @media (max-width: 520px) {
   .stat-grid { grid-template-columns:1fr 1fr; }
   .topbar-title { font-size:0.88rem; }
-  .tb-actions .theme-btn { display:none; }
+    .tb-actions .theme-btn { display:flex; }
 }
 
 /* ============================================================
