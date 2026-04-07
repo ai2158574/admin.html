@@ -7,7 +7,7 @@
   <title>Nixers Pro | Enterprise Admin Console</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+ <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="css/admin.css">
@@ -670,14 +670,14 @@
       <div class="grid2">
         <div class="panel panel-body">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-            <div style="font-family:'Syne',sans-serif;font-weight:700;">Post Categories</div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;">Post Categories</div>
             <button class="btn btn-accent btn-sm" id="addCatBtn"><i class="fas fa-plus"></i> Add</button>
           </div>
           <div id="catList"></div>
         </div>
         <div class="panel panel-body">
-          <div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:1rem;">Category Statistics</div>
-          <canvas id="catChart" height="260"></canvas>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;margin-bottom:1rem;">Category Statistics</div>
+          <div class="cat-chart-wrap"><canvas id="catChart"></canvas></div>
         </div>
       </div>
     </div>
@@ -818,18 +818,18 @@
       </div>
     </div>
 
-    <!-- ========== SAFETY & INCIDENTS ========== -->
-    <div id="page-safety" style="display:none;">
-      <div class="tabs">
-        <button class="tab-btn" data-stab="overview">Overview</button>
-        <button class="tab-btn" data-stab="inductions">Inductions</button>
-        <button class="tab-btn" data-stab="hazards">Hazards</button>
-        <button class="tab-btn" data-stab="exports">Export Reports</button>
-        <button class="tab-btn active" data-stab="incidents">Incidents</button>
-        <button class="tab-btn" data-stab="checklist">Daily Checklist</button>
-        <button class="tab-btn" data-stab="training">Training</button>
-        <button class="tab-btn" data-stab="score">Safety Scores</button>
-      </div>
+   <!-- ========== SAFETY & INCIDENTS ========== -->
+<div id="page-safety" style="display:none;">
+  <div class="tabs">
+    <button class="tab-btn active" data-stab="overview">Overview</button>  <!-- ADD 'active' HERE -->
+    <button class="tab-btn" data-stab="inductions">Inductions</button>
+    <button class="tab-btn" data-stab="hazards">Hazards</button>
+    <button class="tab-btn" data-stab="exports">Export Reports</button>
+    <button class="tab-btn" data-stab="incidents">Incidents</button>  <!-- REMOVE 'active' FROM HERE -->
+    <button class="tab-btn" data-stab="checklist">Daily Checklist</button>
+    <button class="tab-btn" data-stab="training">Training</button>
+    <button class="tab-btn" data-stab="score">Safety Scores</button>
+  </div>
       <div id="st-overview" style="display:none;">
         <div class="panel" style="margin-bottom:1rem;">
           <div class="panel-hdr"><h5><i class="fas fa-building"></i>Active Site</h5></div>
@@ -1094,46 +1094,71 @@
         <button class="tab-btn" data-settab="data">Data</button>
       </div>
 
-      <!-- General -->
-      <div id="set-general">
-        <div class="grid2">
-          <div class="panel panel-body">
-            <div class="fg"><label class="fl">System Name</label><input class="fc" id="sysName" value="Nixers Construction CMS"></div>
-            <div class="fg"><label class="fl">Default Timezone</label>
-              <select class="fc" id="sysTz">
-                <option>Asia/Dhaka</option><option>America/New_York</option><option>Europe/London</option><option>Asia/Dubai</option>
-              </select>
-            </div>
-            <div class="fg"><label class="fl">Date Format</label>
-              <select class="fc" id="sysDateFmt"><option>YYYY-MM-DD</option><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option></select>
-            </div>
-            <div class="fg"><label class="fl">Language</label>
-              <select class="fc" id="sysLang"><option>English</option><option>বাংলা (Bangla)</option><option>Arabic</option><option>French</option></select>
-            </div>
-            <hr class="div">
-            <div class="sw-row"><div class="sw-info"><div class="sw-label">Email Notifications</div><div class="sw-desc">Get notified via email</div></div><label class="sw"><input type="checkbox" id="swEmail" checked><span class="sw-sl"></span></label></div>
-            <div class="sw-row"><div class="sw-info"><div class="sw-label">SMS Alerts</div><div class="sw-desc">Critical event SMS</div></div><label class="sw"><input type="checkbox" id="swSms"><span class="sw-sl"></span></label></div>
-            <div class="sw-row"><div class="sw-info"><div class="sw-label">Push Notifications</div></div><label class="sw"><input type="checkbox" id="swPush" checked><span class="sw-sl"></span></label></div>
-            <div class="sw-row"><div class="sw-info"><div class="sw-label">Working Hours Config</div><div class="sw-desc">Mon–Fri 08:00–17:00</div></div><label class="sw"><input type="checkbox" id="swWorkHours" checked><span class="sw-sl"></span></label></div>
-            <div class="sw-row"><div class="sw-info"><div class="sw-label">Maintenance Mode</div><div class="sw-desc">Blocks all non-admin access</div></div><label class="sw"><input type="checkbox" id="swMaintenance"><span class="sw-sl"></span></label></div>
-          </div>
-          <div class="panel panel-body">
-            <div class="fg"><label class="fl">Working Hours Start</label><input class="fc" id="workStart" type="time" value="08:00"></div>
-            <div class="fg"><label class="fl">Working Hours End</label><input class="fc" id="workEnd" type="time" value="17:00"></div>
-            <div class="fg"><label class="fl">Work Days</label>
-              <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.35rem;" id="workDays">
-                <label class="day-check"><input type="checkbox" value="Mon" checked> Mon</label>
-                <label class="day-check"><input type="checkbox" value="Tue" checked> Tue</label>
-                <label class="day-check"><input type="checkbox" value="Wed" checked> Wed</label>
-                <label class="day-check"><input type="checkbox" value="Thu" checked> Thu</label>
-                <label class="day-check"><input type="checkbox" value="Fri" checked> Fri</label>
-                <label class="day-check"><input type="checkbox" value="Sat"> Sat</label>
-                <label class="day-check"><input type="checkbox" value="Sun"> Sun</label>
-              </div>
-            </div>
-          </div>
+<!-- General -->
+<div id="set-general">
+  <div class="grid2">
+    <div class="panel panel-body">
+      <div class="fg"><label class="fl">System Name</label><input class="fc" id="sysName" value="Nixers Construction CMS"></div>
+      <div class="fg"><label class="fl">Default Timezone</label>
+        <select class="fc" id="sysTz">
+          <option>Asia/Dhaka</option><option>America/New_York</option><option>Europe/London</option><option>Asia/Dubai</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Date Format</label>
+        <select class="fc" id="sysDateFmt"><option>YYYY-MM-DD</option><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option></select>
+      </div>
+      <div class="fg"><label class="fl">Currency</label>
+        <select class="fc" id="sysCurrency">
+          <option value="USD">USD - US Dollar ($)</option>
+          <option value="EUR">EUR - Euro (€)</option>
+          <option value="GBP">GBP - British Pound (£)</option>
+          <option value="BDT">BDT - Bangladeshi Taka (৳)</option>
+          <option value="AED">AED - UAE Dirham (د.إ)</option>
+          <option value="SAR">SAR - Saudi Riyal (ر.س)</option>
+          <option value="INR">INR - Indian Rupee (₹)</option>
+          <option value="CAD">CAD - Canadian Dollar (C$)</option>
+          <option value="AUD">AUD - Australian Dollar (A$)</option>
+          <option value="JPY">JPY - Japanese Yen (¥)</option>
+          <option value="CNY">CNY - Chinese Yuan (¥)</option>
+          <option value="SGD">SGD - Singapore Dollar (S$)</option>
+          <option value="MYR">MYR - Malaysian Ringgit (RM)</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Currency Symbol Position</label>
+        <select class="fc" id="currencyPosition">
+          <option value="before">Before Amount ($100)</option>
+          <option value="after">After Amount (100$)</option>
+          <option value="space_before">Space Before ($ 100)</option>
+          <option value="space_after">Space After (100 $)</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Language</label>
+        <select class="fc" id="sysLang"><option>English</option><option>বাংলা (Bangla)</option><option>Arabic</option><option>French</option></select>
+      </div>
+      <hr class="div">
+      <div class="sw-row"><div class="sw-info"><div class="sw-label">Email Notifications</div><div class="sw-desc">Get notified via email</div></div><label class="sw"><input type="checkbox" id="swEmail" checked><span class="sw-sl"></span></label></div>
+      <div class="sw-row"><div class="sw-info"><div class="sw-label">SMS Alerts</div><div class="sw-desc">Critical event SMS</div></div><label class="sw"><input type="checkbox" id="swSms"><span class="sw-sl"></span></label></div>
+      <div class="sw-row"><div class="sw-info"><div class="sw-label">Push Notifications</div></div><label class="sw"><input type="checkbox" id="swPush" checked><span class="sw-sl"></span></label></div>
+      <div class="sw-row"><div class="sw-info"><div class="sw-label">Working Hours Config</div><div class="sw-desc">Mon–Fri 08:00–17:00</div></div><label class="sw"><input type="checkbox" id="swWorkHours" checked><span class="sw-sl"></span></label></div>
+      <div class="sw-row"><div class="sw-info"><div class="sw-label">Maintenance Mode</div><div class="sw-desc">Blocks all non-admin access</div></div><label class="sw"><input type="checkbox" id="swMaintenance"><span class="sw-sl"></span></label></div>
+    </div>
+    <div class="panel panel-body">
+      <div class="fg"><label class="fl">Working Hours Start</label><input class="fc" id="workStart" type="time" value="08:00"></div>
+      <div class="fg"><label class="fl">Working Hours End</label><input class="fc" id="workEnd" type="time" value="17:00"></div>
+      <div class="fg"><label class="fl">Work Days</label>
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.35rem;" id="workDays">
+          <label class="day-check"><input type="checkbox" value="Mon" checked> Mon</label>
+          <label class="day-check"><input type="checkbox" value="Tue" checked> Tue</label>
+          <label class="day-check"><input type="checkbox" value="Wed" checked> Wed</label>
+          <label class="day-check"><input type="checkbox" value="Thu" checked> Thu</label>
+          <label class="day-check"><input type="checkbox" value="Fri" checked> Fri</label>
+          <label class="day-check"><input type="checkbox" value="Sat"> Sat</label>
+          <label class="day-check"><input type="checkbox" value="Sun"> Sun</label>
         </div>
       </div>
+    </div>
+  </div>
+</div>
 
       <!-- Security -->
       <div id="set-security" style="display:none;">
@@ -1175,7 +1200,7 @@
       <div id="set-emailjs" style="display:none;">
         <div class="grid2">
           <div class="panel panel-body">
-            <div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:1rem;">EmailJS Configuration</div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;margin-bottom:1rem;">EmailJS Configuration</div>
             <div class="fg"><label class="fl">Service ID</label><input class="fc" id="ejsService" placeholder="service_xxxxxxx"></div>
             <div class="fg"><label class="fl">Public Key</label><input class="fc" id="ejsPublicKey" placeholder="xxxxxxxxxxxxxxx"></div>
             <hr class="div">
@@ -1190,7 +1215,7 @@
             <button class="btn btn-accent btn-sm" id="ejsTestBtn"><i class="fas fa-vial"></i> Send Test Email</button>
           </div>
           <div class="panel panel-body">
-            <div style="font-weight:600;font-size:0.85rem;margin-bottom:0.75rem;font-family:'Syne',sans-serif;">Email Template Previewer</div>
+            <div style="font-weight:600;font-size:0.85rem;margin-bottom:0.75rem;font-family:'Space Grotesk',sans-serif;">Email Template Previewer</div>
             <select class="fc" id="tplPreviewSelect" style="margin-bottom:0.75rem;">
               <option value="welcome">Welcome / Approved</option>
               <option value="leave">Leave Decision</option>
@@ -1226,7 +1251,7 @@
       <div id="set-leave-policy" style="display:none;">
         <div class="grid2">
           <div class="panel panel-body">
-            <div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:1rem;">Leave Allowances (days/year)</div>
+             <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;margin-bottom:1rem;">Leave Allowances (days/year)</div>
             <div class="fg"><label class="fl">Annual Leave</label><input class="fc" type="number" id="lpAnnual" value="20"></div>
             <div class="fg"><label class="fl">Sick Leave</label><input class="fc" type="number" id="lpSick" value="10"></div>
             <div class="fg"><label class="fl">Emergency Leave</label><input class="fc" type="number" id="lpEmergency" value="5"></div>
@@ -1285,7 +1310,7 @@
       <div class="profile-meta">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
           <div>
-            <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;" id="pmName2">-</div>
+             <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.2rem;" id="pmName2">-</div>
             <div style="color:var(--text3);font-size:0.8rem;" id="pmRole2">-</div>
           </div>
           <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
@@ -1317,24 +1342,27 @@
         <div class="fg"><label class="fl">Emergency Contact</label><input class="fc" id="pmEmerg" placeholder="Name — Phone"></div>
         <div class="fg"><label class="fl">Bio / Notes</label><textarea class="fc" id="pmBio" rows="3"></textarea></div>
         <hr class="div">
-        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.85rem;margin-bottom:0.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Avatar Color</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;margin-bottom:0.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Avatar Color</div>
         <div class="avatar-options" id="avColorOpts"></div>
         <div class="fg" style="margin-top:1rem;"><label class="fl">Or Upload Photo</label>
           <div class="file-drop" id="avUploadDrop"><i class="fas fa-camera" style="color:var(--accent);margin-right:0.5rem;"></i>Click to upload profile photo</div>
         </div>
       </div>
 
-      <div id="pmPerf" style="display:none;padding:1.25rem 1.5rem;">
-        <div class="grid3" style="margin-bottom:1.2rem;">
-          <div class="smini"><div class="snum" id="pf_tasks">0</div><div class="slbl">Tasks Completed</div></div>
-          <div class="smini"><div class="snum" id="pf_proc">0</div><div class="slbl">In Processing</div></div>
-          <div class="smini"><div class="snum" id="pf_pend">0</div><div class="slbl">Pending</div></div>
-          <div class="smini"><div class="snum" id="pf_issues">0</div><div class="slbl">Issues Reported</div></div>
-          <div class="smini"><div class="snum" id="pf_rating">0</div><div class="slbl">Rating /5</div></div>
-          <div class="smini"><div class="snum" id="pf_attendance">0%</div><div class="slbl">Attendance</div></div>
-        </div>
-        <canvas id="pmPerfChart" height="210"></canvas>
-      </div>
+<div id="pmPerf" style="display:none;padding:1.25rem 1.5rem;">
+  <div class="grid3" style="margin-bottom:1.2rem;">
+    <div class="smini"><div class="snum" id="pf_tasks">0</div><div class="slbl">Tasks Completed</div></div>
+    <div class="smini"><div class="snum" id="pf_proc">0</div><div class="slbl">In Processing</div></div>
+    <div class="smini"><div class="snum" id="pf_pend">0</div><div class="slbl">Pending</div></div>
+    <div class="smini"><div class="snum" id="pf_issues">0</div><div class="slbl">Issues Reported</div></div>
+    <div class="smini"><div class="snum" id="pf_rating">0</div><div class="slbl">Rating /5</div></div>
+    <div class="smini"><div class="snum" id="pf_attendance">0%</div><div class="slbl">Attendance</div></div>
+  </div>
+
+  <div style="height: 250px; position: relative; margin-top: 1rem;">
+    <canvas id="pmPerfChart" style="width: 100%; height: 100%;"></canvas>
+  </div>
+</div>
 
       <div id="pmDocs" style="display:none;padding:1.25rem 1.5rem;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.85rem;">
@@ -1348,32 +1376,63 @@
         <div id="pmHistList"></div>
       </div>
 
-      <div id="pmIdCard" style="display:none;padding:1.25rem 1.5rem;">
-        <div class="grid2">
-          <div>
-            <div class="id-card" id="idCardEl">
-              <div class="id-card-logo">NIXERS<span style="color:white;font-weight:400;">.pro</span></div>
-              <div class="id-av" id="icAv">A</div>
-              <div class="id-name" id="icName">-</div>
-              <div class="id-role" id="icRole">-</div>
-              <div class="id-field"><div class="lbl">Employee ID</div><div class="val" id="icEmpId">-</div></div>
-              <div class="id-field"><div class="lbl">ID Card No.</div><div class="val" id="icIdNum">-</div></div>
-              <div class="id-field"><div class="lbl">Department</div><div class="val" id="icDept">-</div></div>
-              <div class="id-field"><div class="lbl">Date Hired</div><div class="val" id="icHired">-</div></div>
-              <div class="id-barcode">
-                <div style="font-size:1.4rem;letter-spacing:1px;color:rgba(255,255,255,0.7);">|||||||||||||||||||||||||||||</div>
-                <div class="bc-num" id="icBarcode">NX-000-0000</div>
-              </div>
+<div id="pmIdCard" style="display:none;padding:1.25rem 1.5rem;">
+  <div class="grid2" style="gap: 1.5rem;">
+    <!-- ID Card -->
+    <div>
+      <div class="id-card" id="idCardEl">
+        <!-- Left Section -->
+        <div class="id-card-left">
+          <div class="id-card-logo">NIXERS<span>.pro</span></div>
+          <div class="id-av" id="icAv">A</div>
+          <div class="id-name" id="icName">-</div>
+          <div class="id-role" id="icRole">-</div>
+        </div>
+        
+        <!-- Divider (hidden on mobile) -->
+        <div class="id-card-divider"></div>
+        
+        <!-- Right Section -->
+        <div class="id-card-right">
+          <div class="id-fields-grid">
+            <div class="id-field">
+              <span class="lbl">Employee ID</span>
+              <span class="val" id="icEmpId">-</span>
+            </div>
+            <div class="id-field">
+              <span class="lbl">ID Card No.</span>
+              <span class="val" id="icIdNum">-</span>
+            </div>
+            <div class="id-field">
+              <span class="lbl">Department</span>
+              <span class="val" id="icDept">-</span>
+            </div>
+            <div class="id-field">
+              <span class="lbl">Date Hired</span>
+              <span class="val" id="icHired">-</span>
             </div>
           </div>
-          <div>
-            <div style="font-weight:600;margin-bottom:0.75rem;font-family:'Syne',sans-serif;">Account Details</div>
-            <div class="info-grid" id="icInfoGrid" style="gap:0.75rem 1rem;"></div>
-            <hr class="div">
-            <button class="btn btn-accent btn-sm" id="printIdBtn"><i class="fas fa-print"></i> Print ID Card</button>
+          <div class="id-barcode">
+            <div>||||||||||||||||||||||||||||||||||||</div>
+            <div class="bc-num" id="icBarcode">NX-000-0000</div>
           </div>
         </div>
       </div>
+    </div>
+    
+    <!-- Account Details Side -->
+    <div>
+      <div style="font-weight:700;margin-bottom:1rem;font-family:'Space Grotesk',sans-serif;font-size:0.9rem;color:var(--text2);">
+        <i class="fas fa-user-circle" style="margin-right:0.5rem;color:var(--accent);"></i>Account Details
+      </div>
+      <div class="info-grid" id="icInfoGrid" style="gap:0.75rem 1rem;"></div>
+      <hr class="div" style="margin: 1rem 0;">
+      <button class="btn btn-accent btn-sm" id="printIdBtn">
+        <i class="fas fa-print"></i> Print ID Card
+      </button>
+    </div>
+  </div>
+</div>
     </div>
     <div class="mftr" id="pmFtr">
       <button class="btn btn-outline btn-sm" data-close="profileModal">Cancel</button>
@@ -1391,12 +1450,30 @@
         <div class="fg"><label class="fl">Site Name</label><input class="fc" id="sm_name"></div>
         <div class="fg"><label class="fl">Manager</label><select class="fc" id="sm_mgr"></select></div>
         <div class="fg"><label class="fl">Budget</label><input class="fc" id="sm_budget" placeholder="$0.00"></div>
+        <div class="fg"><label class="fl">Spent</label><input class="fc" id="sm_spent" placeholder="$0.00"></div>
         <div class="fg"><label class="fl">Status</label><select class="fc" id="sm_status"><option value="planning">Planning</option><option value="active">Active</option><option value="completed">Completed</option><option value="on-hold">On Hold</option></select></div>
         <div class="fg"><label class="fl">Start Date</label><input class="fc" id="sm_start" type="date"></div>
         <div class="fg"><label class="fl">Expected End</label><input class="fc" id="sm_end" type="date"></div>
       </div>
-      <div class="fg"><label class="fl">Progress (%)</label><input class="fc" id="sm_prog" type="number" min="0" max="100" value="0"></div>
-      <div class="fg"><label class="fl">Description</label><textarea class="fc" id="sm_desc" rows="3"></textarea></div>
+   <div class="fg">
+  <label class="fl">Progress (%)</label>
+  <input class="fc" id="sm_prog" type="number" min="0" max="100" value="0">
+</div>
+
+<!-- Worker Assignment Section (same pattern as posts and projects) -->
+<div class="fg">
+  <label class="fl">Assign Workers</label>
+  <div class="assign-search-wrap">
+    <input class="fc" id="sm_workerSearch" placeholder="Search workers by name...">
+    <div class="assign-results" id="sm_workerResults"></div>
+  </div>
+  <div class="assign-tags" id="sm_workerTags"></div>
+</div>
+
+<div class="fg">
+  <label class="fl">Description</label>
+  <textarea class="fc" id="sm_desc" rows="3"></textarea>
+</div>
     </div>
     <div class="mftr"><button class="btn btn-outline" data-close="siteModal">Cancel</button><button class="btn btn-accent" id="sm_save">Save</button></div>
   </div>
@@ -1486,10 +1563,20 @@
       <div class="frow">
         <div class="fg"><label class="fl">Project</label><select class="fc" id="tm_project"></select></div>
         <div class="fg"><label class="fl">Priority</label><select class="fc" id="tm_priority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
-        <div class="fg"><label class="fl">Assignee</label><select class="fc" id="tm_assignee"></select></div>
+        <div class="fg" style="grid-column:1/-1;"><label class="fl">Assignees</label><div class="assign-search-wrap"><input class="fc" id="tm_assigneeSearch" placeholder="Search team members..."><div class="assign-results" id="tm_assigneeResults"></div></div><div class="assign-tags" id="tm_assigneeTags"></div></div>
         <div class="fg"><label class="fl">Due Date</label><input class="fc" id="tm_due" type="date"></div>
       </div>
       <div class="fg"><label class="fl">Description</label><textarea class="fc" id="tm_desc" rows="3"></textarea></div>
+            <div class="fg">
+        <label class="fl">Attachments</label>
+        <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem;">
+          <div class="voice-rec-btn" id="tm_voiceBtn"><i class="fas fa-microphone"></i> Record Voice</div>
+          <button class="btn btn-outline btn-sm" id="tm_attachBtn"><i class="fas fa-paperclip"></i> Attach Files</button>
+          <input type="file" id="tm_files" multiple style="display:none">
+        </div>
+        <div class="attached-files" id="tm_attFiles"></div>
+        <div id="tm_voiceStatus" style="display:none;font-size:0.78rem;color:#f87171;margin-top:0.35rem;"><i class="fas fa-circle" style="animation:pulse 1s infinite;margin-right:0.35rem;"></i>Recording...</div>
+      </div>
       <div class="fg"><label class="fl">Status</label><select class="fc" id="tm_status"><option value="todo">To Do</option><option value="inprogress">In Progress</option><option value="review">Review</option><option value="done">Done</option></select></div>
     </div>
     <div class="mftr"><button class="btn btn-outline" data-close="taskModal">Cancel</button><button class="btn btn-accent" id="tm_save">Save Task</button></div>
@@ -1509,6 +1596,11 @@
         <div class="fg"><label class="fl">Site</label><select class="fc" id="proj_site"></select></div>
       </div>
       <div class="fg"><label class="fl">Description</label><textarea class="fc" id="proj_desc" rows="3"></textarea></div>
+      <div class="fg">
+        <label class="fl">Assign Team</label>
+        <div class="assign-search-wrap"><input class="fc" id="proj_teamSearch" placeholder="Search users..."><div class="assign-results" id="proj_teamResults"></div></div>
+        <div class="assign-tags" id="proj_teamTags"></div>
+      </div>
     </div>
     <div class="mftr"><button class="btn btn-outline" data-close="projectModal">Cancel</button><button class="btn btn-accent" id="proj_save">Save</button></div>
   </div>
@@ -1682,7 +1774,7 @@
 <div class="fc-btn" id="fcBtn"><i class="fas fa-comment-dots"></i></div>
 <div class="fc-widget" id="fcWidget">
   <div class="fc-hdr">
-    <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.88rem;">Quick Chat</div>
+   <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.88rem;">Quick Chat</div>
     <div style="font-size:0.72rem;color:var(--text3);margin-left:auto;">All Users</div>
     <button style="background:none;border:none;color:var(--text3);cursor:pointer;margin-left:0.5rem;" id="fcCloseBtn"><i class="fas fa-times"></i></button>
   </div>
