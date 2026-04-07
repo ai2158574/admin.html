@@ -8,176 +8,10 @@
 /* ============================================================
    1. DATA STORE
    ============================================================ */
-const DB = {
-  users: [
-    { id:1, name:'Arif Rahman',    email:'arif@nixers.pro',    phone:'+880-171-0001', role:'admin',   dept:'Management',   status:'active',  empId:'EMP-0001', idNum:'NX-ADM-001', natId:'NID-11111', dob:'1985-03-15', hired:'2018-01-10', salary:5000, addr:'Dhaka, BD', emerg:'Wife — +880-171-9999', bio:'Super administrator.', avatarColor:'#eab308', avatarImg:'', lastLogin:'2025-07-07 09:12', registered:'2018-01-10', online:'online'  },
-    { id:2, name:'Nadia Islam',    email:'nadia@nixers.pro',   phone:'+880-172-0002', role:'manager', dept:'Construction', status:'active',  empId:'EMP-0002', idNum:'NX-MGR-001', natId:'NID-22222', dob:'1990-06-20', hired:'2019-03-01', salary:3200, addr:'Chittagong, BD', emerg:'Husband — +880-172-8888', bio:'Senior site manager.', avatarColor:'#3b82f6', avatarImg:'', lastLogin:'2025-07-07 08:45', registered:'2019-03-01', online:'online'  },
-    { id:3, name:'Karim Hossain',  email:'karim@nixers.pro',   phone:'+880-173-0003', role:'worker',  dept:'Electrical',  status:'active',  empId:'EMP-0003', idNum:'NX-WRK-001', natId:'NID-33333', dob:'1992-11-08', hired:'2020-06-15', salary:1800, addr:'Sylhet, BD',      emerg:'Father — +880-173-7777', bio:'Electrician.', avatarColor:'#10b981', avatarImg:'', lastLogin:'2025-07-06 17:30', registered:'2020-06-15', online:'away'   },
-    { id:4, name:'Sadia Begum',    email:'sadia@nixers.pro',   phone:'+880-174-0004', role:'worker',  dept:'Civil',       status:'active',  empId:'EMP-0004', idNum:'NX-WRK-002', natId:'NID-44444', dob:'1994-02-28', hired:'2021-01-20', salary:1600, addr:'Rajshahi, BD',    emerg:'Mother — +880-174-6666', bio:'Civil engineer.', avatarColor:'#8b5cf6', avatarImg:'', lastLogin:'2025-07-05 16:00', registered:'2021-01-20', online:'offline'},
-    { id:5, name:'Rahim Mia',      email:'rahim@nixers.pro',   phone:'+880-175-0005', role:'manager', dept:'Safety',      status:'active',  empId:'EMP-0005', idNum:'NX-MGR-002', natId:'NID-55555', dob:'1988-09-12', hired:'2019-08-01', salary:2900, addr:'Khulna, BD',      emerg:'Wife — +880-175-5555', bio:'Safety manager.', avatarColor:'#f97316', avatarImg:'', lastLogin:'2025-07-07 07:55', registered:'2019-08-01', online:'online'  },
-    { id:6, name:'Tania Khatun',   email:'tania@nixers.pro',   phone:'+880-176-0006', role:'worker',  dept:'Plumbing',    status:'inactive',empId:'EMP-0006', idNum:'NX-WRK-003', natId:'NID-66666', dob:'1995-07-04', hired:'2022-03-10', salary:1500, addr:'Comilla, BD',     emerg:'Brother — +880-176-4444', bio:'Plumber.', avatarColor:'#f43f5e', avatarImg:'', lastLogin:'2025-06-30 14:20', registered:'2022-03-10', online:'offline'},
-    { id:7, name:'Farhan Ahmed',   email:'farhan@nixers.pro',  phone:'+880-177-0007', role:'worker',  dept:'Construction',status:'pending', empId:'EMP-0007', idNum:'NX-WRK-004', natId:'NID-77777', dob:'1997-04-18', hired:'2025-07-01', salary:1400, addr:'Barishal, BD',    emerg:'Sister — +880-177-3333', bio:'New hire.', avatarColor:'#eab308', avatarImg:'', lastLogin:'Never', registered:'2025-07-01', online:'offline'},
-    { id:8, name:'Mitu Akter',     email:'mitu@nixers.pro',    phone:'+880-178-0008', role:'worker',  dept:'Finishing',   status:'pending', empId:'EMP-0008', idNum:'NX-WRK-005', natId:'NID-88888', dob:'1999-12-01', hired:'2025-07-02', salary:1350, addr:'Mymensingh, BD',  emerg:'Father — +880-178-2222', bio:'Painter.', avatarColor:'#3b82f6', avatarImg:'', lastLogin:'Never', registered:'2025-07-02', online:'offline'},
-  ],
-  sites: [
-    { id:1, name:'Bashundhara Tower A', managerId:2, workerIds:[3,4,6], progress:72, budget:500000, spent:360000, status:'active',    startDate:'2024-01-15', endDate:'2025-12-31', desc:'High-rise residential tower.' },
-    { id:2, name:'Gulshan Plaza B',     managerId:5, workerIds:[3,7],   progress:35, budget:300000, spent:105000, status:'planning',  startDate:'2025-03-01', endDate:'2026-06-30', desc:'Commercial complex.' },
-    { id:3, name:'Dhanmondi Road Fix',  managerId:2, workerIds:[4,8],   progress:100,budget:80000,  spent:78500,  status:'completed', startDate:'2023-06-01', endDate:'2024-08-15', desc:'Road resurfacing project.' },
-    { id:4, name:'Uttara Bridge',       managerId:5, workerIds:[3,6,7],  progress:15, budget:750000, spent:112500, status:'active',    startDate:'2025-01-01', endDate:'2027-01-01', desc:'Bridge construction.' },
-  ],
-  categories: [
-    { id:1, name:'Safety',       color:'#ef4444', icon:'fa-shield-halved' },
-    { id:2, name:'Announcement', color:'#eab308', icon:'fa-bullhorn'       },
-    { id:3, name:'Update',       color:'#3b82f6', icon:'fa-rotate'         },
-    { id:4, name:'General',      color:'#8b5cf6', icon:'fa-comment'        },
-    { id:5, name:'Maintenance',  color:'#f97316', icon:'fa-wrench'         },
-  ],
-  posts: [
-    { id:1, title:'Safety Briefing – Tower A', authorId:1, catId:1, visibility:'all',      assignedIds:[3,4], content:'All workers must attend safety briefing on Monday 08:00.', location:'Bashundhara Tower A', files:[], created:'2025-07-01', status:'published', views:47 },
-    { id:2, title:'Q2 Progress Update',         authorId:2, catId:3, visibility:'managers', assignedIds:[],    content:'Q2 targets achieved. Details in the attached report.',       location:'',                   files:[], created:'2025-07-03', status:'published', views:12 },
-    { id:3, title:'New Equipment Arrived',       authorId:5, catId:5, visibility:'workers',  assignedIds:[3,6], content:'New scaffolding sets are available at site depot.',           location:'Site Depot',         files:[], created:'2025-07-05', status:'published', views:31 },
-  ],
-  groups: [
-    { id:1, name:'All Hands',       icon:'📢', desc:'Company-wide channel', memberIds:[1,2,3,4,5,6,7,8] },
-    { id:2, name:'Site Managers',   icon:'🏗️', desc:'Managers only',        memberIds:[1,2,5]           },
-    { id:3, name:'Safety Team',     icon:'🦺', desc:'Safety alerts',         memberIds:[1,5,3,4]         },
-  ],
-  messages: {
-    1: [
-      { id:1, groupId:1, authorId:1, text:'Good morning team! Safety briefing is at 08:00 today.', time:'08:02', files:[] },
-      { id:2, groupId:1, authorId:3, text:'Understood. We will be there.', time:'08:15', files:[] },
-      { id:3, groupId:1, authorId:2, text:'Please bring your PPE kits.', time:'08:17', files:[] },
-    ],
-    2: [
-      { id:1, groupId:2, authorId:2, text:'Gulshan Plaza B permit approved!', time:'09:00', files:[] },
-      { id:2, groupId:2, authorId:5, text:'Great news. Starting mobilisation next week.', time:'09:10', files:[] },
-    ],
-    3: [
-      { id:1, groupId:3, authorId:5, text:'Incident report filed for Tower A. Please review.', time:'14:30', files:[] },
-    ],
-  },
-  leaveRequests: [
-    { id:1, userId:3, type:'annual',    from:'2025-07-10', to:'2025-07-14', days:5, reason:'Family vacation',        status:'pending',  applied:'2025-07-02', comment:'' },
-    { id:2, userId:6, type:'sick',      from:'2025-07-08', to:'2025-07-09', days:2, reason:'Fever',                  status:'approved', applied:'2025-07-07', comment:'Get well soon.' },
-    { id:3, userId:4, type:'emergency', from:'2025-07-03', to:'2025-07-03', days:1, reason:'Family emergency',       status:'approved', applied:'2025-07-03', comment:'' },
-    { id:4, userId:7, type:'annual',    from:'2025-07-20', to:'2025-07-25', days:6, reason:'Wedding attendance',     status:'pending',  applied:'2025-07-05', comment:'' },
-    { id:5, userId:4, type:'unpaid',    from:'2025-08-01', to:'2025-08-05', days:5, reason:'Personal reasons',       status:'rejected', applied:'2025-07-01', comment:'Insufficient notice.' },
-  ],
-  holidays: [
-    { id:1, date:'2025-02-21', name:'Language Martyrs Day', type:'National' },
-    { id:2, date:'2025-03-26', name:'Independence Day',     type:'National' },
-    { id:3, date:'2025-04-14', name:'Bengali New Year',     type:'Cultural' },
-    { id:4, date:'2025-12-16', name:'Victory Day',          type:'National' },
-  ],
-  timesheets: [
-    { id:1, userId:3, week:'2025-W27', mon:8, tue:8, wed:8, thu:8, fri:8, sat:0, sun:0, status:'approved', comment:'' },
-    { id:2, userId:4, week:'2025-W27', mon:8, tue:8, wed:7, thu:8, fri:8, sat:4, sun:0, status:'pending',  comment:'' },
-    { id:3, userId:6, week:'2025-W27', mon:0, tue:8, wed:8, thu:8, fri:8, sat:0, sun:0, status:'approved', comment:'' },
-    { id:4, userId:3, week:'2025-W26', mon:8, tue:8, wed:8, thu:8, fri:8, sat:0, sun:0, status:'approved', comment:'' },
-  ],
-  payroll: [
-    { id:1, userId:1, period:'2025-06', baseSalary:5000, overtime:0,   bonus:500,  allowances:300, deductions:200, status:'paid'      },
-    { id:2, userId:2, period:'2025-06', baseSalary:3200, overtime:320, bonus:200,  allowances:200, deductions:160, status:'paid'      },
-    { id:3, userId:3, period:'2025-06', baseSalary:1800, overtime:270, bonus:0,    allowances:100, deductions:90,  status:'processed' },
-    { id:4, userId:4, period:'2025-06', baseSalary:1600, overtime:200, bonus:0,    allowances:100, deductions:80,  status:'processed' },
-    { id:5, userId:5, period:'2025-06', baseSalary:2900, overtime:0,   bonus:300,  allowances:200, deductions:145, status:'paid'      },
-    { id:6, userId:6, period:'2025-06', baseSalary:1500, overtime:0,   bonus:0,    allowances:100, deductions:75,  status:'draft'     },
-  ],
-  projects: [
-    { id:1, name:'Tower A Structural Phase', siteId:1, status:'active',    priority:'high',   dueDate:'2025-10-01', desc:'Main structural work for Tower A.',  teamIds:[2,3,4], progress:65 },
-    { id:2, name:'Gulshan MEP Planning',     siteId:2, status:'planning',  priority:'medium', dueDate:'2025-09-01', desc:'M&E planning for Gulshan Plaza.',    teamIds:[2,5],   progress:20 },
-    { id:3, name:'Bridge Foundation',        siteId:4, status:'active',    priority:'high',   dueDate:'2026-01-01', desc:'Foundation work for Uttara Bridge.', teamIds:[3,7,5], progress:15 },
-  ],
-  tasks: [
-    { id:1, projectId:1, title:'Pour foundation slab',       assigneeId:3, priority:'high',   dueDate:'2025-07-15', status:'done',       desc:'Complete the foundation slab pour.' },
-    { id:2, projectId:1, title:'Install rebar Level 1-5',    assigneeId:4, priority:'high',   dueDate:'2025-07-25', status:'inprogress', desc:'Rebar installation floors 1 to 5.'  },
-    { id:3, projectId:1, title:'Electrical conduit rough-in', assigneeId:3, priority:'medium', dueDate:'2025-08-10', status:'todo',       desc:'Run conduit on all floors.'          },
-    { id:4, projectId:2, title:'MEP drawings review',        assigneeId:2, priority:'medium', dueDate:'2025-08-01', status:'review',     desc:'Review and approve MEP drawings.'   },
-    { id:5, projectId:3, title:'Soil test report',           assigneeId:5, priority:'high',   dueDate:'2025-07-20', status:'done',       desc:'Obtain geotechnical report.'        },
-    { id:6, projectId:3, title:'Excavation Phase 1',         assigneeId:7, priority:'high',   dueDate:'2025-08-15', status:'inprogress', desc:'Excavate to 4m depth.'              },
-  ],
-  equipment: [
-    { id:1, name:'Concrete Mixer CM-500', category:'Heavy Equipment', serial:'CM500-2021-001', condition:'good',    assigneeId:3, siteId:1, status:'checked-out', nextService:'2025-08-01' },
-    { id:2, name:'Scaffolding Set A',     category:'Safety',          serial:'SC-A-2022-012',  condition:'fair',    assigneeId:null, siteId:1, status:'available',   nextService:'2025-07-15' },
-    { id:3, name:'Excavator JD-200',      category:'Heavy Equipment', serial:'JD200-2020-005', condition:'good',    assigneeId:7, siteId:4, status:'checked-out', nextService:'2025-09-01' },
-    { id:4, name:'Angle Grinder AG-4',    category:'Power Tool',      serial:'AG4-2023-033',   condition:'damaged', assigneeId:null, siteId:null, status:'maintenance', nextService:'2025-07-10' },
-    { id:5, name:'Laser Level LL-200',    category:'Survey Tool',     serial:'LL200-2023-007', condition:'good',    assigneeId:4, siteId:2, status:'checked-out', nextService:'2025-10-01' },
-  ],
-  incidents: [
-    { id:1, date:'2025-07-03 10:30', siteId:1, reporterId:5, type:'near-miss', severity:'medium', desc:'Worker slipped on wet concrete but no injury.', actions:'Area marked with warning signs.', status:'resolved' },
-    { id:2, date:'2025-06-28 14:15', siteId:4, reporterId:5, type:'injury',    severity:'high',   desc:'Minor hand cut from rebar edge.',               actions:'First aid given, safety brief held.',   status:'resolved' },
-    { id:3, date:'2025-07-06 09:00', siteId:1, reporterId:3, type:'property',  severity:'low',    desc:'Scaffolding pin lost, replaced.',               actions:'Inventory audit scheduled.',             status:'open'     },
-  ],
-  documents: [
-    { id:1, userId:3, name:'NID Card',              type:'Identity',     uploaded:'2025-01-15', expiry:'2030-01-15', status:'approved', notes:'' },
-    { id:2, userId:3, name:'Safety Cert 2025',      type:'Certification', uploaded:'2025-02-01', expiry:'2026-02-01', status:'approved', notes:'' },
-    { id:3, userId:4, name:'NID Card',              type:'Identity',     uploaded:'2025-01-20', expiry:'2035-01-20', status:'approved', notes:'' },
-    { id:4, userId:6, name:'Work Permit',           type:'Legal',        uploaded:'2025-03-10', expiry:'2025-08-10', status:'approved', notes:'Expiring soon' },
-    { id:5, userId:7, name:'Police Clearance',      type:'Legal',        uploaded:'2025-07-01', expiry:'2026-07-01', status:'pending',  notes:'' },
-    { id:6, userId:8, name:'NID Card',              type:'Identity',     uploaded:'2025-07-02', expiry:'2030-07-02', status:'pending',  notes:'' },
-  ],
-  notifications: [
-    { id:1, type:'approval', title:'New user pending approval', desc:'Farhan Ahmed has registered and awaits approval.', time:'2025-07-07 08:00', read:false },
-    { id:2, type:'leave',    title:'Leave request submitted',   desc:'Karim Hossain applied for 5 days annual leave.',  time:'2025-07-07 08:30', read:false },
-    { id:3, type:'alert',    title:'Equipment service overdue', desc:'Angle Grinder AG-4 is past its service date.',    time:'2025-07-06 17:00', read:false },
-    { id:4, type:'task',     title:'Task assigned to you',      desc:'Install rebar Level 1-5 assigned by Nadia.',      time:'2025-07-05 12:00', read:true  },
-    { id:5, type:'system',   title:'System backup completed',   desc:'Daily backup completed successfully.',            time:'2025-07-05 03:00', read:true  },
-  ],
-  emailLog: [
-    { id:1, to:'karim@nixers.pro',  subject:'Task Assigned',        template:'task_assigned',    sentAt:'2025-07-05 12:01', status:'sent'   },
-    { id:2, to:'sadia@nixers.pro',  subject:'Welcome to Nixers Pro', template:'welcome_approved', sentAt:'2025-07-01 10:05', status:'sent'   },
-    { id:3, to:'tania@nixers.pro',  subject:'Leave Rejected',        template:'leave_decision',   sentAt:'2025-07-01 09:20', status:'sent'   },
-    { id:4, to:'farhan@nixers.pro', subject:'Account Pending',       template:'welcome_approved', sentAt:'2025-07-01 08:00', status:'failed' },
-  ],
-  auditLog: [
-    { id:1, time:'2025-07-07 09:12', userId:1, action:'login',   target:'system',        details:'Admin logged in',          ip:'192.168.1.1',  status:'success' },
-    { id:2, time:'2025-07-07 08:45', userId:2, action:'login',   target:'system',        details:'Manager logged in',        ip:'192.168.1.5',  status:'success' },
-    { id:3, time:'2025-07-06 17:30', userId:1, action:'update',  target:'User #6',       details:'Status set to inactive',   ip:'192.168.1.1',  status:'success' },
-    { id:4, time:'2025-07-06 15:00', userId:2, action:'approve', target:'Leave #2',      details:'Leave approved with note', ip:'192.168.1.5',  status:'success' },
-    { id:5, time:'2025-07-05 12:01', userId:1, action:'create',  target:'Task #2',       details:'Task created, assigned',   ip:'192.168.1.1',  status:'success' },
-    { id:6, time:'2025-07-05 09:00', userId:5, action:'create',  target:'Incident #3',   details:'Incident report filed',    ip:'192.168.1.9',  status:'success' },
-    { id:7, time:'2025-07-04 11:30', userId:1, action:'delete',  target:'Post #draft',   details:'Draft post deleted',       ip:'192.168.1.1',  status:'success' },
-    { id:8, time:'2025-07-03 08:00', userId:3, action:'login',   target:'system',        details:'Worker login attempt',     ip:'10.0.0.22',    status:'success' },
-  ],
-  clients: [
-    { id:1, name:'Greenfield Developers', contact:'Mr. Hassan',   email:'hassan@greenfield.com', phone:'+880-191-0001', siteIds:[1,2], status:'active' },
-    { id:2, name:'Delta Holdings',        contact:'Ms. Priya',    email:'priya@delta.com',       phone:'+880-192-0002', siteIds:[4],   status:'active' },
-  ],
-  tickets: [
-    { id:1, clientId:1, subject:'Delay in Tower A handover',    priority:'high',   assigneeId:2, status:'open',        created:'2025-07-01', updated:'2025-07-05', desc:'Client requesting update on delay.' },
-    { id:2, clientId:2, subject:'Bridge inspection scheduling', priority:'medium', assigneeId:5, status:'in-progress', created:'2025-06-20', updated:'2025-07-03', desc:'Need to coordinate inspection date.' },
-  ],
-  shifts: {},
-  settings: {
-    systemName:'Nixers Construction CMS', timezone:'Asia/Dhaka', dateFormat:'YYYY-MM-DD', language:'English',
-    emailNotif:true, smsAlerts:false, pushNotif:true, maintenanceMode:false,
-    workStart:'08:00', workEnd:'17:00', workDays:['Mon','Tue','Wed','Thu','Fri'],
-    sessionTimeout:30, maxLoginAttempts:5, passwordMinLen:8,
-    twoFactor:false, ipWhitelist:false, auditLogging:true,
-    accentColor:'#eab308', compactMode:false, animations:true,
-    ejsService:'', ejsPublicKey:'', ejsTplWelcome:'', ejsTplLeave:'',
-    ejsTplDoc:'', ejsTplTask:'', ejsTplPayslip:'', ejsTplIncident:'', ejsTplTicket:'',
-    companyName:'Nixers Construction Ltd.', companyAddress:'', companyPhone:'', companyEmail:'', companyWeb:'', logoImg:'',
-    lpAnnual:20, lpSick:10, lpEmergency:5, lpMaxConsec:14, lpNotice:3, carryForward:true, requireApproval:true,
-  },
-  leaveBalance: {
-    3: { annual:20, sick:10, emergency:5, annualUsed:5,  sickUsed:2, emergencyUsed:1, unpaidUsed:0 },
-    4: { annual:20, sick:10, emergency:5, annualUsed:1,  sickUsed:0, emergencyUsed:1, unpaidUsed:0 },
-    5: { annual:20, sick:10, emergency:5, annualUsed:3,  sickUsed:1, emergencyUsed:0, unpaidUsed:0 },
-    6: { annual:20, sick:10, emergency:5, annualUsed:2,  sickUsed:2, emergencyUsed:0, unpaidUsed:0 },
-    7: { annual:20, sick:10, emergency:5, annualUsed:0,  sickUsed:0, emergencyUsed:0, unpaidUsed:0 },
-  },
-  roles: [
-    { id:'admin',   name:'Admin',   color:'#8b5cf6', perms:['all'] },
-    { id:'manager', name:'Manager', color:'#eab308', perms:['users.view','sites.manage','tasks.manage','leave.approve','reports.view'] },
-    { id:'worker',  name:'Worker',  color:'#3b82f6', perms:['profile.edit','tasks.view','leave.apply','messages.send'] },
-  ],
-  rbacPerms: {
-    admin:   { users:true,  sites:true,  tasks:true,  posts:true,  leave:true,  payroll:true,  reports:true,  settings:true,  audit:true  },
-    manager: { users:false, sites:true,  tasks:true,  posts:true,  leave:true,  payroll:false, reports:true,  settings:false, audit:false },
-    worker:  { users:false, sites:false, tasks:false, posts:false, leave:false, payroll:false, reports:false, settings:false, audit:false },
-  },
-};
+const DB = window.APP_DATA?.DB;
+if (!DB) {
+  throw new Error('Missing shared data store. Load js/data.js before js/admin.js');
+}
 
 /* next IDs */
 const nextId = {};
@@ -2226,6 +2060,9 @@ function renderEmailTemplates(){
    ============================================================ */
 function renderSafety(){
   wireSTabs();
+  renderSafetyOverview();
+  renderInductions();
+  renderHazards();
   renderIncidentTable();
   renderChecklist();
   renderTraining();
@@ -2236,10 +2073,16 @@ function renderSafety(){
   $('incExport')?.addEventListener('click',()=>exportCSV(DB.incidents,'incidents.csv'));
   $('addTrainingBtn')?.addEventListener('click',()=>toast('Training record form (demo)','info'));
   ['incSeverity','incSite'].forEach(id=>$(id)?.addEventListener('change',renderIncidentTable));
+  ['indSearch','indStatus'].forEach(id=>$(id)?.addEventListener('input',renderInductions));
+  ['hazSearch','hazStatus','hazType'].forEach(id=>$(id)?.addEventListener('input',renderHazards));
+  $('hazApply')?.addEventListener('click',renderHazards);
+  $('safeRptGenerate')?.addEventListener('click',generateSafetyExport);
+  if ($('safeRptFrom') && !$('safeRptFrom').value) $('safeRptFrom').value = new Date().toISOString().slice(0,10);
+  if ($('safeRptTo') && !$('safeRptTo').value) $('safeRptTo').value = new Date().toISOString().slice(0,10);
 }
 
 function wireSTabs(){
-  const panels={incidents:'st-incidents',checklist:'st-checklist',training:'st-training',score:'st-score'};
+  const panels={overview:'st-overview',inductions:'st-inductions',hazards:'st-hazards',exports:'st-exports',incidents:'st-incidents',checklist:'st-checklist',training:'st-training',score:'st-score'};
   $$('[data-stab]').forEach(btn=>{
     btn.addEventListener('click',()=>{
       $$('[data-stab]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
@@ -2251,7 +2094,75 @@ function wireSTabs(){
 
 function populateSafetySelects(){
   const siteOpts='<option value="">All Sites</option>'+DB.sites.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-  ['incSite','checklistSite','inc_site'].forEach(id=>{const el=$(id);if(el)el.innerHTML=siteOpts;});
+   ['incSite','checklistSite','inc_site','safeActiveSite'].forEach(id=>{const el=$(id);if(el)el.innerHTML=siteOpts;});
+}
+
+function renderSafetyOverview(){
+  const openHazards = DB.incidents.filter(i=>i.status==='open').length;
+  const overdueHazards = DB.incidents.filter(i=>i.status==='open' && i.severity!=='low').length;
+  const inducted = DB.users.filter(u=>u.status==='active').length;
+  $('safeOverviewStats').innerHTML =
+    statCard('fa-users','blue',DB.users.length,'Total Workers','','flat') +
+    statCard('fa-user-check','green',inducted,'Inducted','','flat') +
+    statCard('fa-triangle-exclamation','red',openHazards,'Open Safety Issues','','flat') +
+    statCard('fa-clock','yellow',overdueHazards,'Overdue Hazards','','flat');
+}
+
+function renderInductions(){
+  const q = ($('indSearch')?.value || '').toLowerCase();
+  const st = $('indStatus')?.value || '';
+  const rows = DB.users
+    .filter(u=>u.role!=='admin')
+    .map((u,idx)=>{
+      const statusMap = ['Inducted','Pending Review','In Progress','Not Started','Expired'];
+      const status = statusMap[idx % statusMap.length];
+      return { user:u, company:siteById(DB.sites[idx % DB.sites.length]?.id)?.name || 'Main Contractor', status, updated:nowStr().slice(0,10) };
+    })
+    .filter(r => (!q || r.user.name.toLowerCase().includes(q) || r.company.toLowerCase().includes(q)) && (!st || r.status===st));
+  $('indTbody').innerHTML = rows.map(r=>`<tr>
+    <td><div class="user-cell">${avatarEl(r.user,26)}<span>${r.user.name}</span></div></td>
+    <td>${r.company}</td>
+    <td>${statusBadge(r.status.toLowerCase().replace(/\s+/g,'' )==='inducted'?'active':r.status==='Expired'?'inactive':'pending')}</td>
+    <td style="font-size:0.76rem;">${r.updated}</td>
+  </tr>`).join('') || '<tr><td colspan="4"><div class="empty-state"><i class="fas fa-id-card"></i>No inductions found</div></td></tr>';
+}
+
+function renderHazards(){
+  const q = ($('hazSearch')?.value || '').toLowerCase();
+  const st = $('hazStatus')?.value || '';
+  const type = $('hazType')?.value || '';
+  const rows = DB.incidents.filter(i=>{
+    if (st && i.status!==st) return false;
+    if (type && i.type!==type) return false;
+    if (q && !(`${i.desc} ${siteById(i.siteId)?.name||''}`).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  $('hazardStats').innerHTML =
+    statCard('fa-folder-open','yellow',DB.incidents.filter(i=>i.status==='open').length,'Open','','flat') +
+    statCard('fa-clock','red',DB.incidents.filter(i=>i.status==='open'&&i.severity!=='low').length,'Overdue','','flat') +
+    statCard('fa-check','green',DB.incidents.filter(i=>i.status==='resolved').length,'Closed','','flat');
+  $('hazTbody').innerHTML = rows.map(i=>`<tr>
+    <td style="font-size:0.75rem;">${i.date}</td>
+    <td>${siteById(i.siteId)?.name||'—'}</td>
+    <td><span class="badge b-update">${i.type}</span></td>
+    <td style="font-size:0.8rem;">${i.desc}</td>
+    <td>${statusBadge(i.status==='open'?'active':'completed')}</td>
+  </tr>`).join('') || '<tr><td colspan="5"><div class="empty-state"><i class="fas fa-triangle-exclamation"></i>No hazards found</div></td></tr>';
+}
+
+function generateSafetyExport(){
+  const type = $('safeRptType')?.value;
+  const fmt = $('safeRptFmt')?.value || 'csv';
+  if (!type) { toast('Select report type','error'); return; }
+  if (type==='incidents' || type==='hazards') {
+    if (fmt==='json') downloadJSON(DB.incidents, `${type}.json`);
+    else exportCSV(DB.incidents, `${type}.csv`);
+  } else {
+    const rows = DB.users.filter(u=>u.role!=='admin').map((u, idx)=>({name:u.name, status:['Inducted','Pending Review','In Progress','Not Started','Expired'][idx%5]}));
+    if (fmt==='json') downloadJSON(rows, 'inductions.json');
+    else exportCSV(rows, 'inductions.csv');
+  }
+  toast('Safety export generated','success');
 }
 
 function renderIncidentTable(){
