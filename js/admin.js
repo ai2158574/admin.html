@@ -31,6 +31,7 @@ let projectTeamMembers = [];
 let taskAssignees = [];
 let taskVoiceRecording = false;
 let taskAttachments = [];
+let siteWorkers = []; 
 let leaveCalDate = new Date();
 let shiftWeekOffset = 0;
 let currentPayrollPeriod = '2025-06';
@@ -171,6 +172,165 @@ document.addEventListener('click', e => {
     $('profileDropdown')?.classList.remove('open');
   }
 });
+
+/* ============================================================
+   PAGINATION SYSTEM
+   ============================================================ */
+class Paginator {
+  constructor(data, containerId, renderFn, options = {}) {
+    this.data = data;
+    this.containerId = containerId;
+    this.renderFn = renderFn;
+    this.currentPage = 1;
+    this.perPage = options.perPage || 10;
+    this.perPageOptions = options.perPageOptions || [10, 20, 50, 100, 200];
+    this.onPageChange = options.onPageChange || null;
+    this.init();
+  }
+  
+  init() {
+    this.render();
+  }
+  
+  getTotalPages() {
+    return Math.ceil(this.data.length / this.perPage);
+  }
+  
+  getCurrentPageData() {
+    const start = (this.currentPage - 1) * this.perPage;
+    const end = start + this.perPage;
+    return this.data.slice(start, end);
+  }
+  
+  changePage(page) {
+    if (page < 1 || page > this.getTotalPages()) return;
+    this.currentPage = page;
+    this.render();
+    if (this.onPageChange) this.onPageChange(this.getCurrentPageData(), this.currentPage);
+  }
+  
+  changePerPage(perPage) {
+    this.perPage = perPage;
+    this.currentPage = 1;
+    this.render();
+    if (this.onPageChange) this.onPageChange(this.getCurrentPageData(), this.currentPage);
+  }
+  
+  render() {
+    const container = $(this.containerId);
+    if (!container) return;
+    
+    const currentData = this.getCurrentPageData();
+    const totalPages = this.getTotalPages();
+    const start = (this.currentPage - 1) * this.perPage + 1;
+    const end = Math.min(this.currentPage * this.perPage, this.data.length);
+    
+    // Render the table body
+    this.renderFn(currentData);
+    
+    // Generate pagination HTML
+    const paginationHtml = `
+      <div class="pagination-container">
+        <div class="pagination-info">
+          Showing ${start} to ${end} of ${this.data.length} entries
+        </div>
+        <div class="pagination-controls">
+          <select class="per-page-select" id="perPage-${this.containerId}">
+            ${this.perPageOptions.map(opt => `<option value="${opt}" ${this.perPage === opt ? 'selected' : ''}>${opt} per page</option>`).join('')}
+          </select>
+          <button class="pagination-btn" id="firstPage-${this.containerId}" ${this.currentPage === 1 ? 'disabled' : ''}>
+            <i class="fas fa-angle-double-left"></i>
+          </button>
+          <button class="pagination-btn" id="prevPage-${this.containerId}" ${this.currentPage === 1 ? 'disabled' : ''}>
+            <i class="fas fa-angle-left"></i>
+          </button>
+          <div class="pagination-numbers" id="pageNumbers-${this.containerId}">
+            ${this.generatePageNumbers(totalPages)}
+          </div>
+          <button class="pagination-btn" id="nextPage-${this.containerId}" ${this.currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}>
+            <i class="fas fa-angle-right"></i>
+          </button>
+          <button class="pagination-btn" id="lastPage-${this.containerId}" ${this.currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}>
+            <i class="fas fa-angle-double-right"></i>
+          </button>
+        </div>
+      </div>
+    `;
+    
+    // Add pagination after the table
+    const tableWrapper = container.closest('.panel') || container.parentElement;
+    let paginationDiv = document.getElementById(`pagination-${this.containerId}`);
+    
+    if (!paginationDiv) {
+      paginationDiv = document.createElement('div');
+      paginationDiv.id = `pagination-${this.containerId}`;
+      tableWrapper.appendChild(paginationDiv);
+    }
+    
+    paginationDiv.innerHTML = paginationHtml;
+    
+    // Bind events
+    $(`perPage-${this.containerId}`)?.addEventListener('change', (e) => {
+      this.changePerPage(parseInt(e.target.value));
+    });
+    
+    $(`firstPage-${this.containerId}`)?.addEventListener('click', () => this.changePage(1));
+    $(`prevPage-${this.containerId}`)?.addEventListener('click', () => this.changePage(this.currentPage - 1));
+    $(`nextPage-${this.containerId}`)?.addEventListener('click', () => this.changePage(this.currentPage + 1));
+    $(`lastPage-${this.containerId}`)?.addEventListener('click', () => this.changePage(totalPages));
+    
+    // Bind page number clicks
+    document.querySelectorAll(`#pageNumbers-${this.containerId} .page-number`).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const page = parseInt(btn.dataset.page);
+        if (page) this.changePage(page);
+      });
+    });
+  }
+  
+  generatePageNumbers(totalPages) {
+    if (totalPages <= 1) return '';
+    
+    let pages = [];
+    let start = Math.max(1, this.currentPage - 2);
+    let end = Math.min(totalPages, this.currentPage + 2);
+    
+    if (start > 1) {
+      pages.push(`<div class="page-number" data-page="1">1</div>`);
+      if (start > 2) pages.push(`<div class="page-number disabled">...</div>`);
+    }
+    
+    for (let i = start; i <= end; i++) {
+      pages.push(`<div class="page-number ${i === this.currentPage ? 'pagination-active' : ''}" data-page="${i}">${i}</div>`);
+    }
+    
+    if (end < totalPages) {
+      if (end < totalPages - 1) pages.push(`<div class="page-number disabled">...</div>`);
+      pages.push(`<div class="page-number" data-page="${totalPages}">${totalPages}</div>`);
+    }
+    
+    return pages.join('');
+  }
+  
+  updateData(newData) {
+    this.data = newData;
+    this.currentPage = 1;
+    this.render();
+  }
+}
+
+// Store paginator instances
+let paginators = {};
+
+// Helper function to create paginator for a table
+function createPaginator(tableId, data, renderFn, options = {}) {
+  if (paginators[tableId]) {
+    paginators[tableId].updateData(data);
+  } else {
+    paginators[tableId] = new Paginator(data, tableId, renderFn, options);
+  }
+  return paginators[tableId];
+}
 
 /* ============================================================
    5. THEME
@@ -485,7 +645,6 @@ function renderDashAudit() {
    ============================================================ */
 function renderUsers() {
   populateUserFilterSelects();
-  renderUserTable();
   wireUserFilters();
   wireUserBulk();
 
@@ -494,14 +653,17 @@ function renderUsers() {
   $('csvImportFile')?.addEventListener('change', handleCSVImport);
   $('resetF')?.addEventListener('click', () => {
     ['fName','fEmail','fPhone','fRole','fStatus'].forEach(id => { const el=$(id); if(el) el.value=''; });
-    renderUserTable();
+    filterAndUpdateUsers();
   });
 
   $$('[data-utab]').forEach(btn => btn.addEventListener('click', () => {
     $$('[data-utab]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    renderUserTable(btn.dataset.utab);
+    filterAndUpdateUsers(btn.dataset.utab);
   }));
+  
+  // Initial load
+  filterAndUpdateUsers();
 }
 
 function populateUserFilterSelects() {
@@ -519,31 +681,60 @@ function populateUserFilterSelects() {
 
 function wireUserFilters() {
   ['fName','fEmail','fPhone','fRole','fStatus'].forEach(id => {
-    $(id)?.addEventListener('input', () => renderUserTable());
+    $(id)?.addEventListener('input', () => filterAndUpdateUsers());
   });
 }
 
 function wireUserBulk() {
   $('selectAll')?.addEventListener('change', e => {
-    $$('.row-check').forEach(cb => { cb.checked = e.target.checked; });
-    selectedUserIds = e.target.checked ? new Set(DB.users.map(u=>u.id)) : new Set();
+    // Get current visible users from paginator
+    let visibleUsers = [];
+    if (paginators['uTbody']) {
+      visibleUsers = paginators['uTbody'].getCurrentPageData();
+    } else {
+      visibleUsers = DB.users;
+    }
+    
+    $$('.row-check').forEach(cb => { 
+      cb.checked = e.target.checked; 
+    });
+    
+    if (e.target.checked) {
+      visibleUsers.forEach(u => selectedUserIds.add(u.id));
+    } else {
+      visibleUsers.forEach(u => selectedUserIds.delete(u.id));
+    }
     updateBulkBar();
   });
+  
   $('bulkActivate')?.addEventListener('click', () => {
     selectedUserIds.forEach(id => { const u=userById(id); if(u) u.status='active'; });
-    selectedUserIds.clear(); renderUserTable(); updateBulkBar(); toast('Users activated','success');
+    selectedUserIds.clear(); 
+    filterAndUpdateUsers(); 
+    updateBulkBar(); 
+    toast('Users activated','success');
   });
+  
   $('bulkDeactivate')?.addEventListener('click', () => {
     selectedUserIds.forEach(id => { const u=userById(id); if(u) u.status='inactive'; });
-    selectedUserIds.clear(); renderUserTable(); updateBulkBar(); toast('Users deactivated','warn');
+    selectedUserIds.clear(); 
+    filterAndUpdateUsers(); 
+    updateBulkBar(); 
+    toast('Users deactivated','warn');
   });
+  
   $('bulkDelete')?.addEventListener('click', () => {
     if (!confirm(`Delete ${selectedUserIds.size} users?`)) return;
     DB.users.splice(0, DB.users.length, ...DB.users.filter(u=>!selectedUserIds.has(u.id)));
-    selectedUserIds.clear(); renderUserTable(); updateBulkBar(); toast('Users deleted','success');
+    selectedUserIds.clear(); 
+    filterAndUpdateUsers(); 
+    updateBulkBar(); 
+    toast('Users deleted','success');
   });
+  
   $('bulkClear')?.addEventListener('click', () => {
-    selectedUserIds.clear(); $$('.row-check').forEach(cb=>cb.checked=false);
+    selectedUserIds.clear(); 
+    $$('.row-check').forEach(cb=>cb.checked=false);
     if($('selectAll')) $('selectAll').checked=false;
     updateBulkBar();
   });
@@ -556,14 +747,15 @@ function updateBulkBar() {
   $('bulkCount').textContent = `${selectedUserIds.size} selected`;
 }
 
-function renderUserTable(tab='all') {
+// New function to filter users and update paginator
+function filterAndUpdateUsers(tab = 'all') {
   const name   = $('fName')?.value.toLowerCase()  || '';
   const email  = $('fEmail')?.value.toLowerCase() || '';
   const phone  = $('fPhone')?.value.toLowerCase() || '';
   const role   = $('fRole')?.value  || '';
   const status = $('fStatus')?.value|| '';
 
-  let users = DB.users.filter(u => {
+  let filteredUsers = DB.users.filter(u => {
     if (tab==='pending' && u.status!=='pending') return false;
     if (name   && !u.name.toLowerCase().includes(name))   return false;
     if (email  && !u.email.toLowerCase().includes(email)) return false;
@@ -573,49 +765,76 @@ function renderUserTable(tab='all') {
     return true;
   });
 
-  $('uCount').textContent = `${users.length} user${users.length!==1?'s':''}`;
+  $('uCount').textContent = `${filteredUsers.length} user${filteredUsers.length!==1?'s':''}`;
   $('pendingCount').textContent = DB.users.filter(u=>u.status==='pending').length;
   $('pendingCount').style.display = DB.users.filter(u=>u.status==='pending').length>0 ? '' : 'none';
+  
+  // Create or update paginator
+  createPaginator('uTbody', filteredUsers, (data) => {
+    renderUserTableBody(data, tab);
+  }, { perPage: 10 });
+}
 
-  $('uTbody').innerHTML = users.length ? users.map((u,i) => `
-    <tr>
-      <td><input type="checkbox" class="row-check" data-uid="${u.id}" ${selectedUserIds.has(u.id)?'checked':''}></td>
-      <td style="color:var(--text3);font-size:0.75rem;">${i+1}</td>
-      <td><div class="user-cell">${avatarEl(u)} <div><div style="font-weight:600;">${u.name}</div><div style="font-size:0.72rem;color:var(--text3);">${u.empId}</div></div></div></td>
-      <td>${u.email}</td>
-      <td>${u.phone}</td>
-      <td>${roleBadge(u.role)}</td>
-      <td>${u.dept||'—'}</td>
-      <td>${statusBadge(u.status)}</td>
-      <td>${onlineDot(u)}</td>
-      <td style="font-size:0.75rem;">${fmt(u.registered)}</td>
-      <td style="font-size:0.75rem;">${u.lastLogin}</td>
-      <td>
-        <div style="display:flex;gap:0.2rem;flex-wrap:wrap;">
-          <button class="abt inf" title="View Profile" onclick="openProfileModal(${u.id})"><i class="fas fa-eye"></i></button>
-          <button class="abt warn" title="Edit" onclick="openUserModal(${u.id})"><i class="fas fa-pen"></i></button>
-          ${u.status==='pending'?`<button class="abt suc" title="Approve" onclick="openApprovalModal(${u.id})"><i class="fas fa-check"></i></button>`:''}
-          <button class="abt" title="Switch to User" onclick="impersonateUser(${u.id})"><i class="fas fa-user-secret"></i></button>
-          <button class="abt dan" title="Delete" onclick="deleteUser(${u.id})"><i class="fas fa-trash"></i></button>
-        </div>
-      </td>
-    </tr>`).join('') :
+// New function to render only the table body (without pagination logic)
+function renderUserTableBody(users, tab) {
+  $('uTbody').innerHTML = users.length ? users.map((u,i) => {
+    const globalIndex = DB.users.findIndex(user => user.id === u.id) + 1;
+    return `
+      <tr>
+        <td><input type="checkbox" class="row-check" data-uid="${u.id}" ${selectedUserIds.has(u.id)?'checked':''}></td>
+        <td style="color:var(--text3);font-size:0.75rem;">${globalIndex}</td>
+        <td><div class="user-cell">${avatarEl(u)} <div><div style="font-weight:600;">${u.name}</div><div style="font-size:0.72rem;color:var(--text3);">${u.empId}</div></div></div></td>
+        <td>${u.email}</td>
+        <td>${u.phone}</td>
+        <td>${roleBadge(u.role)}</td>
+        <td>${u.dept||'—'}</td>
+        <td>${statusBadge(u.status)}</td>
+        <td>${onlineDot(u)}</td>
+        <td style="font-size:0.75rem;">${fmt(u.registered)}</td>
+        <td style="font-size:0.75rem;">${u.lastLogin}</td>
+        <td>
+          <div style="display:flex;gap:0.2rem;flex-wrap:wrap;">
+            <button class="abt inf" title="View Profile" onclick="openProfileModal(${u.id})"><i class="fas fa-eye"></i></button>
+            <button class="abt warn" title="Edit" onclick="openUserModal(${u.id})"><i class="fas fa-pen"></i></button>
+            ${u.status==='pending'?`<button class="abt suc" title="Approve" onclick="openApprovalModal(${u.id})"><i class="fas fa-check"></i></button>`:''}
+            <button class="abt" title="Switch to User" onclick="impersonateUser(${u.id})"><i class="fas fa-user-secret"></i></button>
+            <button class="abt dan" title="Delete" onclick="deleteUser(${u.id})"><i class="fas fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('') :
     '<tr><td colspan="12"><div class="empty-state"><i class="fas fa-users"></i>No users found</div></td></tr>';
-
-  /* Wire row checkboxes */
+    
+  // Wire row checkboxes
   $$('.row-check').forEach(cb => {
-    cb.addEventListener('change', e => {
-      const uid = +e.target.dataset.uid;
-      e.target.checked ? selectedUserIds.add(uid) : selectedUserIds.delete(uid);
-      updateBulkBar();
-    });
+    cb.removeEventListener('change', handleRowCheck);
+    cb.addEventListener('change', handleRowCheck);
   });
+}
+
+function handleRowCheck(e) {
+  const uid = +e.target.dataset.uid;
+  e.target.checked ? selectedUserIds.add(uid) : selectedUserIds.delete(uid);
+  updateBulkBar();
+  
+  // Update select all checkbox
+  const selectAll = $('selectAll');
+  if (selectAll) {
+    const currentPageUsers = paginators['uTbody']?.getCurrentPageData() || [];
+    const allChecked = currentPageUsers.length > 0 && currentPageUsers.every(u => selectedUserIds.has(u.id));
+    selectAll.checked = allChecked;
+  }
 }
 
 function deleteUser(id) {
   if (!confirm('Delete this user?')) return;
   const idx = DB.users.findIndex(u => u.id === id);
-  if (idx > -1) { DB.users.splice(idx,1); logAction('delete',`User #${id}`,'User deleted'); renderUserTable(); toast('User deleted','success'); }
+  if (idx > -1) { 
+    DB.users.splice(idx,1); 
+    logAction('delete',`User #${id}`,'User deleted'); 
+    filterAndUpdateUsers(); 
+    toast('User deleted','success'); 
+  }
 }
 
 function handleCSVImport(e) {
@@ -635,7 +854,8 @@ function handleCSVImport(e) {
         added++;
       }
     });
-    renderUserTable(); toast(`Imported ${added} users`, 'success');
+    filterAndUpdateUsers(); 
+    toast(`Imported ${added} users`, 'success');
     e.target.value = '';
   };
   reader.readAsText(file);
@@ -767,20 +987,43 @@ function savePMUser(userId) {
 }
 
 function renderPMPerf(user) {
-  const userTasks  = DB.tasks.filter(t => t.assigneeId === user.id);
+  const userTasks = DB.tasks.filter(t => taskAssigneeIds(t).includes(user.id));
   $('pf_tasks').textContent = userTasks.filter(t=>t.status==='done').length;
   $('pf_proc').textContent  = userTasks.filter(t=>t.status==='inprogress').length;
   $('pf_pend').textContent  = userTasks.filter(t=>t.status==='todo').length;
   $('pf_issues').textContent= DB.incidents.filter(i=>i.reporterId===user.id).length;
   $('pf_rating').textContent= '4.2';
   $('pf_attendance').textContent= '96%';
+  
   setTimeout(() => {
+    // Destroy existing chart if it exists
+    if (chartInstances['pmPerfChart']) {
+      chartInstances['pmPerfChart'].destroy();
+      delete chartInstances['pmPerfChart'];
+    }
+    
     makeChart('pmPerfChart',{
       type:'line',
-      data:{ labels:['Jan','Feb','Mar','Apr','May','Jun','Jul'], datasets:[{label:'Tasks Done', data:[2,4,3,6,5,8,userTasks.filter(t=>t.status==='done').length], borderColor:'#eab308', backgroundColor:'rgba(234,179,8,0.1)', fill:true, tension:0.4}] },
-      options:{...chartDefaults(),plugins:{legend:{display:false}}}
+      data:{ 
+        labels:['Jan','Feb','Mar','Apr','May','Jun','Jul'], 
+        datasets:[{
+          label:'Tasks Done', 
+          data:[2,4,3,6,5,8,userTasks.filter(t=>t.status==='done').length], 
+          borderColor:'#eab308', 
+          backgroundColor:'rgba(234,179,8,0.1)', 
+          fill:true, 
+          tension:0.4
+        }]
+      },
+      options:{
+        responsive: true,
+        maintainAspectRatio: true,  
+        plugins:{
+          legend:{ display: false }
+        }
+      }
     });
-  },100);
+  }, 150); 
 }
 
 function renderPMDocs(userId) {
@@ -846,75 +1089,217 @@ function decideUserApproval(userId, decision) {
    ============================================================ */
 function renderSites() {
   $('addSiteBtn')?.addEventListener('click', () => openSiteModal());
-  renderSiteTable();
+  filterAndUpdateSites(); // Changed from renderSiteTable()
 }
 
-function renderSiteTable() {
-  const managers = DB.users.filter(u=>u.role==='manager');
-  $('sTbody').innerHTML = DB.sites.map(s => {
+// New function to filter and paginate sites
+function filterAndUpdateSites() {
+  // You can add search/filter functionality here if needed
+  // For now, just show all sites
+  const allSites = [...DB.sites];
+  
+  // Create paginator for sites table
+  if (allSites.length >= 0) {
+    createPaginator('sTbody', allSites, (data) => {
+      renderSiteTableBody(data);
+    }, { perPage: 10 });
+  }
+}
+
+// New function to render only the table body
+function renderSiteTableBody(sites) {
+  if (!sites.length) {
+    $('sTbody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-building"></i>No sites found</div></td></tr>';
+    return;
+  }
+  
+  $('sTbody').innerHTML = sites.map(s => {
     const mgr = userById(s.managerId);
-    const workers = s.workerIds.length;
+    const workers = s.workerIds?.length || 0;
     const pct = s.progress;
-    return `<tr>
-      <td><div style="font-weight:600;">${s.name}</div></td>
-      <td><div class="user-cell">${avatarEl(mgr,26)}<span style="font-size:0.82rem;">${mgr?.name||'—'}</span></div></td>
-      <td>${workers}</td>
-      <td><div style="display:flex;align-items:center;gap:0.5rem;min-width:100px;"><div class="pb" style="flex:1;height:7px;"><div class="pb-fill" style="width:${pct}%;"></div></div><span style="font-size:0.75rem;color:var(--text3);">${pct}%</span></div></td>
-      <td>${fmtMoney(s.budget)}</td>
-      <td>${fmtMoney(s.spent)}</td>
-      <td>${statusBadge(s.status)}</td>
-      <td style="font-size:0.78rem;">${fmt(s.endDate)}</td>
-      <td>
-        <button class="abt inf" onclick="openSiteDetail(${s.id})"><i class="fas fa-eye"></i></button>
-        <button class="abt warn" onclick="openSiteModal(${s.id})"><i class="fas fa-pen"></i></button>
-        <button class="abt dan" onclick="deleteSite(${s.id})"><i class="fas fa-trash"></i></button>
-      </td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-building"></i>No sites found</div></td></tr>';
+    return `
+      <tr>
+        <td><div style="font-weight:600;">${s.name}</div></td>
+        <td><div class="user-cell">${avatarEl(mgr,26)}<span style="font-size:0.82rem;">${mgr?.name || '—'}</span></div></td>
+        <td>${workers}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.5rem;min-width:100px;">
+            <div class="pb" style="flex:1;height:7px;"><div class="pb-fill" style="width:${pct}%;"></div></div>
+            <span style="font-size:0.75rem;color:var(--text3);">${pct}%</span>
+          </div>
+        </td>
+        <td>${fmtMoney(s.budget)}</td>
+        <td>${fmtMoney(s.spent)}</td>
+        <td>${statusBadge(s.status)}</td>
+        <td style="font-size:0.78rem;">${fmt(s.endDate)}</td>
+        <td>
+          <button class="abt inf" onclick="openSiteDetail(${s.id})"><i class="fas fa-eye"></i></button>
+          <button class="abt warn" onclick="openSiteModal(${s.id})"><i class="fas fa-pen"></i></button>
+          <button class="abt dan" onclick="deleteSite(${s.id})"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// Keep original function for compatibility (if called elsewhere)
+function renderSiteTable() {
+  filterAndUpdateSites();
+}
+
+// Function to search workers for site assignment
+function searchSiteWorkers(q = '') {
+  const res = $('sm_workerResults');
+  if (!res) return;
+  
+  const query = q.trim().toLowerCase();
+  if (!query) {
+    res.classList.remove('show');
+    return;
+  }
+  
+  const workers = DB.users.filter(u => 
+    u.role === 'worker' && 
+    u.status === 'active' &&
+    !siteWorkers.includes(u.id) && 
+    u.name.toLowerCase().includes(query)
+  );
+  
+  if (workers.length) {
+    res.innerHTML = workers.map(w => `
+      <div class="assign-opt" onclick="addSiteWorker(${w.id})">
+        ${avatarEl(w, 24)}
+        <span>${w.name}</span>
+        <span style="font-size:0.7rem;color:var(--text3);margin-left:auto;">${w.dept || 'Worker'}</span>
+      </div>
+    `).join('');
+    res.classList.add('show');
+  } else {
+    res.innerHTML = '<div style="padding:0.5rem;color:var(--text3);font-size:0.8rem;">No workers found</div>';
+    res.classList.add('show');
+  }
+}
+
+// Function to add a worker to the site
+function addSiteWorker(id) {
+  if (!siteWorkers.includes(id)) {
+    siteWorkers.push(id);
+  }
+  renderSiteWorkerTags();
+  $('sm_workerResults').classList.remove('show');
+  $('sm_workerSearch').value = '';
+}
+
+// Function to remove a worker from the site
+function removeSiteWorker(id) {
+  siteWorkers = siteWorkers.filter(x => x !== id);
+  renderSiteWorkerTags();
+}
+
+// Function to render worker tags
+function renderSiteWorkerTags() {
+  const container = $('sm_workerTags');
+  if (!container) return;
+  
+  if (siteWorkers.length === 0) {
+    container.innerHTML = '<div style="font-size:0.78rem;color:var(--text3);padding:0.35rem 0;">No workers assigned</div>';
+    return;
+  }
+  
+  container.innerHTML = siteWorkers.map(id => {
+    const u = userById(id);
+    return `<div class="assign-tag">${u?.name || id}<button onclick="removeSiteWorker(${id})">×</button></div>`;
+  }).join('');
 }
 
 function openSiteModal(siteId=null) {
   const managers = DB.users.filter(u=>u.role==='manager');
   $('sm_mgr').innerHTML = managers.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
   const s = siteId ? siteById(siteId) : null;
+  
+  // Reset and load site workers
+  siteWorkers = s?.workerIds ? [...s.workerIds] : [];
+  
   $('smTitle').textContent = s ? 'Edit Site' : 'Add Site';
   $('sm_name').value   = s?.name   || '';
   $('sm_mgr').value    = s?.managerId || managers[0]?.id || '';
   $('sm_budget').value = s?.budget  || '';
-    $('sm_spent').value  = s?.spent   || '';
+  $('sm_spent').value  = s?.spent   || '';
   $('sm_status').value = s?.status  || 'planning';
   $('sm_start').value  = s?.startDate|| '';
   $('sm_end').value    = s?.endDate  || '';
   $('sm_prog').value   = s?.progress || 0;
   $('sm_desc').value   = s?.desc     || '';
+  
+  // Render worker tags
+  renderSiteWorkerTags();
+  
+  // Setup worker search
+  const workerSearch = $('sm_workerSearch');
+  if (workerSearch) {
+    // Remove any existing event listeners
+    workerSearch.oninput = null;
+    workerSearch.oninput = (e) => searchSiteWorkers(e.target.value);
+  }
+  
+  // Close results when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', function closeSiteWorkerResults(e) {
+      if (!e.target.closest('#sm_workerSearch') && !e.target.closest('#sm_workerResults')) {
+        const results = $('sm_workerResults');
+        if (results) results.classList.remove('show');
+      }
+    });
+  }, 100);
+  
   $('sm_save').onclick = () => saveSite(siteId);
   openM('siteModal');
 }
 
 function saveSite(siteId) {
   const data = {
-    name:$('sm_name').value.trim(), managerId:+$('sm_mgr').value,
-    budget:+$('sm_budget').value||0, status:$('sm_status').value,
-      spent:+$('sm_spent').value||0,
-    startDate:$('sm_start').value, endDate:$('sm_end').value,
-    progress:+$('sm_prog').value||0, desc:$('sm_desc').value.trim(), workerIds:[],
+    name:$('sm_name').value.trim(), 
+    managerId:+$('sm_mgr').value,
+    budget:+$('sm_budget').value||0, 
+    spent:+$('sm_spent').value||0,
+    status:$('sm_status').value,
+    startDate:$('sm_start').value, 
+    endDate:$('sm_end').value,
+    progress:+$('sm_prog').value||0, 
+    desc:$('sm_desc').value.trim(), 
+    workerIds: [...siteWorkers],
+  };
+  
   if (!data.name) { toast('Site name required','error'); return; }
-  if (siteId) { Object.assign(siteById(siteId), data); logAction('update',`Site #${siteId}`,`Updated ${data.name}`); }
-  else { DB.sites.push({id:generateId('sites'),...data}); logAction('create','Site',`Created ${data.name}`); }
-  closeM('siteModal'); renderSiteTable(); toast('Site saved','success');
+  
+  if (siteId) { 
+    const site = siteById(siteId);
+    if (site) {
+      Object.assign(site, data); 
+      logAction('update',`Site #${siteId}`,`Updated ${data.name} with ${data.workerIds.length} workers`); 
+    }
+  } else { 
+    DB.sites.push({id:generateId('sites'),...data}); 
+    logAction('create','Site',`Created ${data.name} with ${data.workerIds.length} workers`); 
+  }
+  
+  closeM('siteModal'); 
+  filterAndUpdateSites(); // Updated to use paginated version
+  toast('Site saved','success');
 }
 
 function deleteSite(id) {
   if (!confirm('Delete this site?')) return;
   DB.sites.splice(DB.sites.findIndex(s=>s.id===id),1);
-  logAction('delete',`Site #${id}`,'Site deleted'); renderSiteTable(); toast('Site deleted','success');
+  logAction('delete',`Site #${id}`,'Site deleted'); 
+  filterAndUpdateSites(); // Updated to use paginated version
+  toast('Site deleted','success');
 }
 
 function openSiteDetail(siteId) {
   const s = siteById(siteId);
   if (!s) return;
   const mgr = userById(s.managerId);
-  const workers = s.workerIds.map(id=>userById(id)).filter(Boolean);
+  const workers = (s.workerIds || []).map(id=>userById(id)).filter(Boolean);
   $('sdTitle').textContent = s.name;
   $('sdBody').innerHTML = `
     <div class="info-grid" style="margin-bottom:1rem;">
@@ -942,11 +1327,11 @@ function openSiteDetail(siteId) {
    ============================================================ */
 function renderPosts() {
   populateCatFilter();
-  renderPostTable();
+  filterAndUpdatePosts(); // Changed from renderPostTable()
   $('addPostBtn')?.addEventListener('click', () => openPostModal());
-  $('fPost')?.addEventListener('input', renderPostTable);
-  $('fVis')?.addEventListener('change', renderPostTable);
-  $('fCat')?.addEventListener('change', renderPostTable);
+  $('fPost')?.addEventListener('input', filterAndUpdatePosts);
+  $('fVis')?.addEventListener('change', filterAndUpdatePosts);
+  $('fCat')?.addEventListener('change', filterAndUpdatePosts);
 }
 
 function populateCatFilter() {
@@ -956,35 +1341,61 @@ function populateCatFilter() {
   pmCat.innerHTML = DB.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
 }
 
-function renderPostTable() {
-  const q   = $('fPost')?.value.toLowerCase()||'';
-  const vis = $('fVis')?.value ||'';
-  const cat = $('fCat')?.value ||'';
-  const posts = DB.posts.filter(p => {
-    if (q   && !p.title.toLowerCase().includes(q)) return false;
-    if (vis && p.visibility!==vis) return false;
-    if (cat && p.catId!==+cat) return false;
+// New function to filter and paginate posts
+function filterAndUpdatePosts() {
+  const q   = $('fPost')?.value.toLowerCase() || '';
+  const vis = $('fVis')?.value || '';
+  const cat = $('fCat')?.value || '';
+  
+  const filteredPosts = DB.posts.filter(p => {
+    if (q && !p.title.toLowerCase().includes(q)) return false;
+    if (vis && p.visibility !== vis) return false;
+    if (cat && p.catId !== +cat) return false;
     return true;
   });
+  
+  // Create paginator for posts table
+  if (filteredPosts.length >= 0) {
+    createPaginator('pTbody', filteredPosts, (data) => {
+      renderPostTableBody(data);
+    }, { perPage: 10 });
+  }
+}
+
+// New function to render only the table body
+function renderPostTableBody(posts) {
+  if (!posts.length) {
+    $('pTbody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-newspaper"></i>No posts found</div></td></tr>';
+    return;
+  }
+  
   $('pTbody').innerHTML = posts.map(p => {
     const author = userById(p.authorId);
-    const cat = catById(p.catId);
-    const assigned = p.assignedIds.map(id=>userById(id)?.name).filter(Boolean).join(', ');
-    return `<tr>
-      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.title}</td>
-      <td><div class="user-cell">${avatarEl(author,26)}<span style="font-size:0.82rem;">${author?.name||'—'}</span></div></td>
-      <td>${cat?`<span class="badge" style="background:${cat.color}22;color:${cat.color};"><i class="fas ${cat.icon}" style="font-size:0.65rem;"></i> ${cat.name}</span>`:'—'}</td>
-      <td>${statusBadge(p.visibility==='all'?'published':p.visibility)}</td>
-      <td style="font-size:0.75rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${assigned||'Everyone'}</td>
-      <td style="font-size:0.75rem;">${fmt(p.created)}</td>
-      <td>${statusBadge(p.status)}</td>
-      <td>${p.views}</td>
-      <td>
-        <button class="abt warn" onclick="openPostModal(${p.id})"><i class="fas fa-pen"></i></button>
-        <button class="abt dan" onclick="deletePost(${p.id})"><i class="fas fa-trash"></i></button>
-      </td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-newspaper"></i>No posts found</div></td></tr>';
+    const category = catById(p.catId);
+    const assigned = (p.assignedIds || []).map(id => userById(id)?.name).filter(Boolean).join(', ');
+    return `
+      <tr>
+        <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.title}</td>
+        <td><div class="user-cell">${avatarEl(author,26)}<span style="font-size:0.82rem;">${author?.name || '—'}</span></div></td>
+        <td>
+          ${category ? `<span class="badge" style="background:${category.color}22;color:${category.color};"><i class="fas ${category.icon}" style="font-size:0.65rem;"></i> ${category.name}</span>` : '—'}
+        </td>
+        <td>${statusBadge(p.visibility === 'all' ? 'published' : p.visibility)}</td>
+        <td style="font-size:0.75rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${assigned || 'Everyone'}</td>
+        <td style="font-size:0.75rem;">${fmt(p.created)}</td>
+        <td>${statusBadge(p.status)}</td>
+        <td>${p.views}</td>
+        <td>
+          <button class="abt warn" onclick="openPostModal(${p.id})"><i class="fas fa-pen"></i></button>
+          <button class="abt dan" onclick="deletePost(${p.id})"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// Keep original function for compatibility (if called elsewhere)
+function renderPostTable() {
+  filterAndUpdatePosts();
 }
 
 function openPostModal(postId=null) {
@@ -1000,7 +1411,7 @@ function openPostModal(postId=null) {
   $('pm_content').value  = p?.content || '';
   $('pm_loc').value      = p?.location|| '';
   if (p) postAssignees = [...(p.assignedIds||[])];
-  renderAssignTags();
+  renderAssignTagsPost();
   $('pm_save').onclick = () => savePost(postId);
   $('detectLocBtn')?.addEventListener('click', detectLocation);
   $('pm_assignSearch')?.addEventListener('input', e => searchAssignees(e.target.value));
@@ -1022,19 +1433,19 @@ function searchAssignees(q) {
 
 function addAssignee(id) {
   if (!postAssignees.includes(id)) { postAssignees.push(id); }
-  renderAssignTags();
+  renderAssignTagsPost();
   $('pm_assignResults').classList.remove('show');
   $('pm_assignSearch').value = '';
 }
 
-function renderAssignTags() {
+function renderAssignTagsPost() {
   $('pm_assignTags').innerHTML = postAssignees.map(id => {
     const u = userById(id);
     return `<div class="assign-tag">${u?.name||id}<button onclick="removeAssignee(${id})">×</button></div>`;
   }).join('');
 }
 
-function removeAssignee(id) { postAssignees = postAssignees.filter(x=>x!==id); renderAssignTags(); }
+function removeAssignee(id) { postAssignees = postAssignees.filter(x=>x!==id); renderAssignTagsPost(); }
 
 function addPostFiles(input) {
   Array.from(input.files).forEach(file => {
@@ -1061,9 +1472,13 @@ function togglePostVoice() {
 
 function savePost(postId) {
   const data = {
-    title:$('pm_title').value.trim(), catId:+$('pm_cat').value,
-    visibility:$('pm_vis').value, content:$('pm_content').value.trim(),
-    location:$('pm_loc').value.trim(), assignedIds:[...postAssignees], files:[],
+    title:$('pm_title').value.trim(), 
+    catId:+$('pm_cat').value,
+    visibility:$('pm_vis').value, 
+    content:$('pm_content').value.trim(),
+    location:$('pm_loc').value.trim(), 
+    assignedIds:[...postAssignees], 
+    files:[],
   };
   if (!data.title) { toast('Title required','error'); return; }
   if (postId) {
@@ -1074,13 +1489,17 @@ function savePost(postId) {
     DB.posts.push({id:generateId('posts'),...data, authorId:currentUser.id, created:nowStr().slice(0,10), status:'published', views:0});
     logAction('create','Post',`Created "${data.title}"`);
   }
-  closeM('postModal'); renderPostTable(); toast('Post saved','success');
+  closeM('postModal'); 
+  filterAndUpdatePosts(); // Updated to use paginated version
+  toast('Post saved','success');
 }
 
 function deletePost(id) {
   if (!confirm('Delete this post?')) return;
   DB.posts.splice(DB.posts.findIndex(p=>p.id===id),1);
-  logAction('delete',`Post #${id}`,'Post deleted'); renderPostTable(); toast('Post deleted','success');
+  logAction('delete',`Post #${id}`,'Post deleted'); 
+  filterAndUpdatePosts(); // Updated to use paginated version
+  toast('Post deleted','success');
 }
 
 /* ============================================================
@@ -1290,13 +1709,13 @@ function renderAnalytics() {
    ============================================================ */
 function renderLeave() {
   wireLeaveTabs();
-  renderLeaveTable();
-  renderLeaveBalances();
+  filterAndUpdateLeaveRequests();
+  filterAndUpdateLeaveBalances();
+  filterAndUpdateHolidays();
   renderLeaveCalendar();
-  renderHolidays();
   $('lvExport')?.addEventListener('click',()=>exportCSV(DB.leaveRequests.map(l=>({...l, userName:userById(l.userId)?.name})),'leave_requests.csv'));
   $('addHolidayBtn')?.addEventListener('click', addHoliday);
-  ['lvStatus','lvType','lvFrom','lvTo'].forEach(id=>$(id)?.addEventListener('change',renderLeaveTable));
+  ['lvStatus','lvType','lvFrom','lvTo'].forEach(id => $(id)?.addEventListener('change', filterAndUpdateLeaveRequests));
 }
 
 function wireLeaveTabs() {
@@ -1308,74 +1727,130 @@ function wireLeaveTabs() {
       Object.values(panels).forEach(id=>{ const el=$(id); if(el) el.style.display='none'; });
       const target = $(panels[btn.dataset.lvtab]);
       if(target) target.style.display='';
+      
+      // Refresh pagination when switching tabs
+      if (btn.dataset.lvtab === 'requests') {
+        filterAndUpdateLeaveRequests();
+      } else if (btn.dataset.lvtab === 'balances') {
+        filterAndUpdateLeaveBalances();
+      } else if (btn.dataset.lvtab === 'holidays') {
+        filterAndUpdateHolidays();
+      }
     });
   });
 }
 
-function renderLeaveTable() {
+// ========== LEAVE REQUESTS TABLE ==========
+function filterAndUpdateLeaveRequests() {
   const st   = $('lvStatus')?.value||'';
   const type = $('lvType')?.value||'';
   const from = $('lvFrom')?.value||'';
   const to   = $('lvTo')?.value||'';
-  const rows = DB.leaveRequests.filter(l=>{
-    if(st   && l.status!==st)   return false;
-    if(type && l.type!==type)   return false;
-    if(from && l.from < from)   return false;
-    if(to   && l.to   > to)     return false;
+  
+  const filteredRequests = DB.leaveRequests.filter(l => {
+    if(st   && l.status !== st)   return false;
+    if(type && l.type !== type)   return false;
+    if(from && l.from < from)     return false;
+    if(to   && l.to > to)         return false;
     return true;
   });
-  $('lvTbody').innerHTML = rows.map(l=>{
-    const u = userById(l.userId);
-    return `<tr>
-      <td><div class="user-cell">${avatarEl(u,26)}<span>${u?.name}</span></div></td>
-      <td><span class="badge b-update">${l.type}</span></td>
-      <td>${fmt(l.from)}</td><td>${fmt(l.to)}</td><td>${l.days}</td>
-      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.reason}</td>
-      <td>${statusBadge(l.status)}</td>
-      <td style="font-size:0.75rem;">${fmt(l.applied)}</td>
-      <td>
-        ${l.status==='pending'?`<button class="abt suc" title="Approve" onclick="openLeaveDecision(${l.id},'approve')"><i class="fas fa-check"></i></button><button class="abt dan" title="Reject" onclick="openLeaveDecision(${l.id},'reject')"><i class="fas fa-times"></i></button>`:'<span style="color:var(--text3);font-size:0.75rem;">—</span>'}
-      </td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-calendar"></i>No leave requests</div></td></tr>';
+  
+  createPaginator('lvTbody', filteredRequests, (data) => {
+    renderLeaveTableBody(data);
+  }, { perPage: 10 });
 }
 
+function renderLeaveTableBody(requests) {
+  $('lvTbody').innerHTML = requests.length ? requests.map(l => {
+    const u = userById(l.userId);
+    return `
+      <tr>
+        <td><div class="user-cell">${avatarEl(u,26)}<span>${u?.name}</span></div></td>
+        <td><span class="badge b-update">${l.type}</span></td>
+        <td>${fmt(l.from)}</td><td>${fmt(l.to)}</td><td>${l.days}</td>
+        <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.reason}</td>
+        <td>${statusBadge(l.status)}</td>
+        <td style="font-size:0.75rem;">${fmt(l.applied)}</td>
+        <td>
+          ${l.status === 'pending' ? `
+            <button class="abt suc" title="Approve" onclick="openLeaveDecision(${l.id},'approve')"><i class="fas fa-check"></i></button>
+            <button class="abt dan" title="Reject" onclick="openLeaveDecision(${l.id},'reject')"><i class="fas fa-times"></i></button>
+          ` : '<span style="color:var(--text3);font-size:0.75rem;">—</span>'}
+         </td>
+      </tr>`;
+  }).join('') : '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-calendar"></i>No leave requests found</div></td></tr>';
+}
+
+// ========== LEAVE BALANCES TABLE ==========
+function filterAndUpdateLeaveBalances() {
+  const activeUsers = DB.users.filter(u => u.status === 'active');
+  
+  createPaginator('lvBalTbody', activeUsers, (data) => {
+    renderLeaveBalancesBody(data);
+  }, { perPage: 10 });
+}
+
+function renderLeaveBalancesBody(users) {
+  $('lvBalTbody').innerHTML = users.length ? users.map(u => {
+    const b = DB.leaveBalance[u.id] || {annual:20, sick:10, emergency:5, annualUsed:0, sickUsed:0, emergencyUsed:0, unpaidUsed:0};
+    return `
+      <tr>
+        <td><div class="user-cell">${avatarEl(u,26)}<span>${u.name}</span></div></td>
+        <td>${b.annual - b.annualUsed} / ${b.annual}</td>
+        <td>${b.sick - b.sickUsed} / ${b.sick}</td>
+        <td>${b.emergency - b.emergencyUsed} / ${b.emergency}</td>
+        <td>${b.unpaidUsed}</td>
+        <td>${b.annualUsed + b.sickUsed + b.emergencyUsed + b.unpaidUsed}</td>
+      </tr>`;
+  }).join('') : '<tr><td colspan="6"><div class="empty-state"><i class="fas fa-users"></i>No active users found</div></td></tr>';
+}
+
+// ========== PUBLIC HOLIDAYS TABLE ==========
+function filterAndUpdateHolidays() {
+  createPaginator('holidayTbody', DB.holidays, (data) => {
+    renderHolidaysBody(data);
+  }, { perPage: 10 });
+}
+
+function renderHolidaysBody(holidays) {
+  $('holidayTbody').innerHTML = holidays.length ? holidays.map(h => `
+    <tr>
+      <td>${fmt(h.date)}</td>
+      <td style="font-weight:600;">${h.name}</td>
+      <td><span class="badge b-update">${h.type}</span></td>
+      <td><button class="abt dan" onclick="deleteHoliday(${h.id})"><i class="fas fa-trash"></i></button></td>
+    </tr>`).join('') : '<tr><td colspan="4"><div class="empty-state"><i class="fas fa-calendar"></i>No holidays found</div></td></tr>';
+}
+
+// ========== LEAVE DECISION FUNCTIONS ==========
 function openLeaveDecision(leaveId, action) {
   const l = DB.leaveRequests.find(x=>x.id===leaveId);
   const u = userById(l?.userId);
-  $('ldTitle').textContent = action==='approve' ? 'Approve Leave' : 'Reject Leave';
+  $('ldTitle').textContent = action === 'approve' ? 'Approve Leave' : 'Reject Leave';
   $('ldInfo').innerHTML = `<strong>${u?.name}</strong> — ${l?.type} leave · ${l?.days} day(s) · ${fmt(l?.from)} to ${fmt(l?.to)}<br><em style="color:var(--text3);font-size:0.8rem;">${l?.reason}</em>`;
   $('ldComment').value = '';
-  $('ldApproveBtn').onclick = () => decideLeave(leaveId,'approved');
-  $('ldRejectBtn').onclick  = () => decideLeave(leaveId,'rejected');
+  $('ldApproveBtn').onclick = () => decideLeave(leaveId, 'approved');
+  $('ldRejectBtn').onclick  = () => decideLeave(leaveId, 'rejected');
   openM('leaveDecisionModal');
 }
 
 function decideLeave(leaveId, decision) {
   const l = DB.leaveRequests.find(x=>x.id===leaveId);
   const u = userById(l?.userId);
-  l.status = decision; l.comment = $('ldComment')?.value||'';
-  logAction(decision==='approved'?'approve':'reject',`Leave #${leaveId}`,`${decision} for ${u?.name}`);
-  sendEmail(u?.email||'', `Leave ${decision}`, 'leave_decision');
-  closeM('leaveDecisionModal'); renderLeaveTable(); toast(`Leave ${decision}`,'success');
+  l.status = decision; 
+  l.comment = $('ldComment')?.value || '';
+  logAction(decision === 'approved' ? 'approve' : 'reject', `Leave #${leaveId}`, `${decision} for ${u?.name}`);
+  sendEmail(u?.email || '', `Leave ${decision}`, 'leave_decision');
+  closeM('leaveDecisionModal'); 
+  filterAndUpdateLeaveRequests();
+  filterAndUpdateLeaveBalances();
+  toast(`Leave ${decision}`, 'success');
 }
 
-function renderLeaveBalances() {
-  $('lvBalTbody').innerHTML = DB.users.filter(u=>u.status==='active').map(u=>{
-    const b = DB.leaveBalance[u.id] || {annual:20,sick:10,emergency:5,annualUsed:0,sickUsed:0,emergencyUsed:0,unpaidUsed:0};
-    return `<tr>
-      <td><div class="user-cell">${avatarEl(u,26)}<span>${u.name}</span></div></td>
-      <td>${b.annual-b.annualUsed} / ${b.annual}</td>
-      <td>${b.sick-b.sickUsed} / ${b.sick}</td>
-      <td>${b.emergency-b.emergencyUsed} / ${b.emergency}</td>
-      <td>${b.unpaidUsed}</td>
-      <td>${b.annualUsed+b.sickUsed+b.emergencyUsed+b.unpaidUsed}</td>
-    </tr>`;
-  }).join('');
-}
-
+// ========== LEAVE CALENDAR ==========
 function renderLeaveCalendar() {
-  const label = $('lvCalLabel'), body = $('lvCalBody'); if(!label||!body) return;
+  const label = $('lvCalLabel'), body = $('lvCalBody'); 
+  if(!label||!body) return;
   const y = leaveCalDate.getFullYear(), m = leaveCalDate.getMonth();
   label.textContent = leaveCalDate.toLocaleString('default',{month:'long', year:'numeric'});
   const firstDay = new Date(y,m,1).getDay();
@@ -1397,27 +1872,42 @@ function renderLeaveCalendar() {
   }
   html += '</div>';
   body.innerHTML = html;
-  $('lvCalPrev')?.addEventListener('click',()=>{ leaveCalDate.setMonth(leaveCalDate.getMonth()-1); renderLeaveCalendar(); });
-  $('lvCalNext')?.addEventListener('click',()=>{ leaveCalDate.setMonth(leaveCalDate.getMonth()+1); renderLeaveCalendar(); });
+  
+  $('lvCalPrev')?.removeEventListener('click', handlePrevMonth);
+  $('lvCalNext')?.removeEventListener('click', handleNextMonth);
+  $('lvCalPrev')?.addEventListener('click', handlePrevMonth);
+  $('lvCalNext')?.addEventListener('click', handleNextMonth);
 }
 
-function renderHolidays() {
-  $('holidayTbody').innerHTML = DB.holidays.map(h=>`<tr>
-    <td>${fmt(h.date)}</td><td style="font-weight:600;">${h.name}</td>
-    <td><span class="badge b-update">${h.type}</span></td>
-    <td><button class="abt dan" onclick="deleteHoliday(${h.id})"><i class="fas fa-trash"></i></button></td>
-  </tr>`).join('') || '<tr><td colspan="4"><div class="empty-state"><i class="fas fa-calendar"></i>No holidays</div></td></tr>';
+function handlePrevMonth() {
+  leaveCalDate.setMonth(leaveCalDate.getMonth() - 1);
+  renderLeaveCalendar();
 }
 
+function handleNextMonth() {
+  leaveCalDate.setMonth(leaveCalDate.getMonth() + 1);
+  renderLeaveCalendar();
+}
+
+// ========== HOLIDAY MANAGEMENT ==========
 function addHoliday() {
-  const name = prompt('Holiday name:'); if(!name) return;
-  const date = prompt('Date (YYYY-MM-DD):'); if(!date) return;
+  const name = prompt('Holiday name:'); 
+  if(!name) return;
+  const date = prompt('Date (YYYY-MM-DD):'); 
+  if(!date) return;
   const type = prompt('Type (National/Cultural/Religious):', 'National')||'National';
-  DB.holidays.push({id:generateId('holidays'),name,date,type});
-  renderHolidays(); toast('Holiday added','success');
+  DB.holidays.push({id:generateId('holidays'), name, date, type});
+  filterAndUpdateHolidays();
+  renderLeaveCalendar();
+  toast('Holiday added','success');
 }
 
-function deleteHoliday(id) { DB.holidays.splice(DB.holidays.findIndex(h=>h.id===id),1); renderHolidays(); }
+function deleteHoliday(id) { 
+  DB.holidays.splice(DB.holidays.findIndex(h=>h.id===id),1); 
+  filterAndUpdateHolidays();
+  renderLeaveCalendar();
+  toast('Holiday deleted','success');
+}
 
 /* ============================================================
    21. TIMESHEETS
@@ -1500,85 +1990,147 @@ function netPay(p) { return p.baseSalary + p.overtime + p.bonus + p.allowances -
 
 function renderPayroll() {
   populatePeriodSelect();
-  renderPayrollTable();
-  $('prExport')?.addEventListener('click',()=>exportCSV(DB.payroll.map(p=>({...p,userName:userById(p.userId)?.name,netPay:netPay(p)})),'payroll.csv'));
-  $('prProcess')?.addEventListener('click',processPayroll);
-  ['prPeriod','prStatus'].forEach(id=>$(id)?.addEventListener('change',renderPayrollTable));
+  filterAndUpdatePayroll();
+  $('prExport')?.addEventListener('click', () => exportCSV(DB.payroll.map(p => ({...p, userName: userById(p.userId)?.name, netPay: netPay(p)})), 'payroll.csv'));
+  $('prProcess')?.addEventListener('click', processPayroll);
+  ['prPeriod', 'prStatus'].forEach(id => $(id)?.addEventListener('change', filterAndUpdatePayroll));
 }
 
 function populatePeriodSelect() {
-  const el=$('prPeriod'); if(!el) return;
-  const periods=['2025-07','2025-06','2025-05','2025-04'];
-  el.innerHTML=periods.map(p=>`<option value="${p}">${p}</option>`).join('');
-  el.value=currentPayrollPeriod;
+  const el = $('prPeriod'); 
+  if (!el) return;
+  const periods = ['2025-07', '2025-06', '2025-05', '2025-04'];
+  el.innerHTML = periods.map(p => `<option value="${p}">${p}</option>`).join('');
+  el.value = currentPayrollPeriod;
 }
 
-function renderPayrollTable() {
-  const period=$('prPeriod')?.value||currentPayrollPeriod;
-  const status=$('prStatus')?.value||'';
-  const rows=DB.payroll.filter(p=>{
-    if(p.period!==period) return false;
-    if(status && p.status!==status) return false;
+function filterAndUpdatePayroll() {
+  const period = $('prPeriod')?.value || currentPayrollPeriod;
+  const status = $('prStatus')?.value || '';
+  
+  // Filter data
+  const filteredPayroll = DB.payroll.filter(p => {
+    if (p.period !== period) return false;
+    if (status && p.status !== status) return false;
     return true;
   });
-  const totalNet=rows.reduce((s,p)=>s+netPay(p),0);
+  
+  // Update stats based on ALL filtered data (not just current page)
+  updatePayrollStats(filteredPayroll);
+  
+  // Create paginator for the table
+  if (filteredPayroll.length > 0) {
+    createPaginator('prTbody', filteredPayroll, (data) => {
+      renderPayrollTableBody(data);
+    }, { perPage: 10 });
+  } else {
+    // If no data, show empty state
+    $('prTbody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-money-bill-wave"></i>No payroll data found</div></td></tr>';
+    // Remove any existing pagination
+    const existingPagination = document.getElementById('pagination-prTbody');
+    if (existingPagination) existingPagination.remove();
+  }
+}
+
+function updatePayrollStats(payrollData) {
+  const totalNet = payrollData.reduce((s, p) => s + netPay(p), 0);
+  const totalBase = payrollData.reduce((s, p) => s + p.baseSalary, 0);
+  const totalOvertime = payrollData.reduce((s, p) => s + p.overtime, 0);
+  
   $('prStats').innerHTML =
-    statCard('fa-users','blue', rows.length,'Employees','','flat')+
-    statCard('fa-money-bill','green', fmtMoney(rows.reduce((s,p)=>s+p.baseSalary,0)),'Base Total','','flat')+
-    statCard('fa-fire','orange', fmtMoney(rows.reduce((s,p)=>s+p.overtime,0)),'Overtime Total','','flat')+
-    statCard('fa-coins','yellow', fmtMoney(totalNet),'Net Payroll','','flat');
-  $('prTbody').innerHTML=rows.map(p=>{
-    const u=userById(p.userId);
-    return `<tr>
-      <td><div class="user-cell">${avatarEl(u,26)}<span>${u?.name}</span></div></td>
-      <td>${fmtMoney(p.baseSalary)}</td>
-      <td style="color:#f97316;">${fmtMoney(p.overtime)}</td>
-      <td style="color:#34d399;">${fmtMoney(p.bonus)}</td>
-      <td>${fmtMoney(p.allowances)}</td>
-      <td style="color:#f87171;">(${fmtMoney(p.deductions)})</td>
-      <td style="font-weight:700;color:var(--accent);">${fmtMoney(netPay(p))}</td>
-      <td>${statusBadge(p.status)}</td>
-      <td>
-        <button class="abt inf" onclick="openPayslip(${p.id})"><i class="fas fa-eye"></i></button>
-        <button class="abt" onclick="emailPayslip(${p.id})"><i class="fas fa-envelope"></i></button>
-      </td>
-    </tr>`;
-  }).join('')||'<tr><td colspan="9"><div class="empty-state"><i class="fas fa-money-bill-wave"></i>No payroll data</div></td></tr>';
+    statCard('fa-users', 'blue', payrollData.length, 'Employees', '', 'flat') +
+    statCard('fa-money-bill', 'green', fmtMoney(totalBase), 'Base Total', '', 'flat') +
+    statCard('fa-fire', 'orange', fmtMoney(totalOvertime), 'Overtime Total', '', 'flat') +
+    statCard('fa-coins', 'yellow', fmtMoney(totalNet), 'Net Payroll', '', 'flat');
+}
+
+function renderPayrollTableBody(payrollRows) {
+  if (!payrollRows.length) {
+    $('prTbody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-money-bill-wave"></i>No payroll data found</div></td></tr>';
+    return;
+  }
+  
+  $('prTbody').innerHTML = payrollRows.map(p => {
+    const u = userById(p.userId);
+    return `
+      <tr>
+        <td><div class="user-cell">${avatarEl(u, 26)}<span>${u?.name || 'Unknown'}</span></div></td>
+        <td>${fmtMoney(p.baseSalary)}</td>
+        <td style="color:#f97316;">${fmtMoney(p.overtime)}</td>
+        <td style="color:#34d399;">${fmtMoney(p.bonus)}</td>
+        <td>${fmtMoney(p.allowances)}</td>
+        <td style="color:#f87171;">(${fmtMoney(p.deductions)})</td>
+        <td style="font-weight:700;color:var(--accent);">${fmtMoney(netPay(p))}</td>
+        <td>${statusBadge(p.status)}</td>
+        <td>
+          <button class="abt inf" onclick="openPayslip(${p.id})"><i class="fas fa-eye"></i></button>
+          <button class="abt" onclick="emailPayslip(${p.id})"><i class="fas fa-envelope"></i></button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// Keep original function for compatibility (if called elsewhere)
+function renderPayrollTable() {
+  filterAndUpdatePayroll();
 }
 
 function processPayroll() {
-  const period=$('prPeriod')?.value||currentPayrollPeriod;
-  DB.payroll.filter(p=>p.period===period&&p.status==='draft').forEach(p=>p.status='processed');
-  renderPayrollTable(); toast('Payroll processed','success'); logAction('update','Payroll',`Period ${period} processed`);
+  const period = $('prPeriod')?.value || currentPayrollPeriod;
+  const payrollEntries = DB.payroll.filter(p => p.period === period && p.status === 'draft');
+  
+  if (payrollEntries.length === 0) {
+    toast('No draft payroll entries found for this period', 'warn');
+    return;
+  }
+  
+  if (confirm(`Process ${payrollEntries.length} payroll entries for period ${period}?`)) {
+    payrollEntries.forEach(p => p.status = 'processed');
+    filterAndUpdatePayroll(); // Refresh the view
+    toast(`${payrollEntries.length} payroll entries processed`, 'success');
+    logAction('update', 'Payroll', `Period ${period} processed with ${payrollEntries.length} entries`);
+  }
 }
 
 function openPayslip(prId) {
-  const p=DB.payroll.find(x=>x.id===prId); if(!p) return;
-  const u=userById(p.userId);
-  $('payslipBody').innerHTML=`<div class="payslip-wrap">
-    <div class="payslip-hdr">
-      <div><div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.1rem;">NIXERS.pro</div><div style="font-size:0.75rem;color:var(--text3);">Payslip — ${p.period}</div></div>
-      <div style="text-align:right;">${avatarEl(u,40)}</div>
-    </div>
-    <div style="margin-bottom:1rem;">${avatarEl(u,36)} <strong>${u?.name}</strong> · ${u?.dept||u?.role}</div>
-    <div class="payslip-row"><span>Basic Salary</span><span>${fmtMoney(p.baseSalary)}</span></div>
-    <div class="payslip-row"><span>Overtime</span><span style="color:#f97316;">+${fmtMoney(p.overtime)}</span></div>
-    <div class="payslip-row"><span>Bonus</span><span style="color:#34d399;">+${fmtMoney(p.bonus)}</span></div>
-    <div class="payslip-row"><span>Allowances</span><span>+${fmtMoney(p.allowances)}</span></div>
-    <div class="payslip-row"><span>Deductions</span><span style="color:#f87171;">-${fmtMoney(p.deductions)}</span></div>
-    <hr class="div">
-    <div class="payslip-row payslip-total"><span>Net Pay</span><span>${fmtMoney(netPay(p))}</span></div>
-    <div style="margin-top:0.75rem;font-size:0.72rem;color:var(--text3);">Status: ${statusBadge(p.status)}</div>
-  </div>`;
-  $('payslipPrintBtn').onclick=()=>window.print();
-  $('payslipEmailBtn').onclick=()=>emailPayslip(prId);
+  const p = DB.payroll.find(x => x.id === prId); 
+  if (!p) return;
+  const u = userById(p.userId);
+  
+  $('payslipBody').innerHTML = `
+    <div class="payslip-wrap">
+      <div class="payslip-hdr">
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.1rem;">NIXERS.pro</div>
+          <div style="font-size:0.75rem;color:var(--text3);">Payslip — ${p.period}</div>
+        </div>
+        <div style="text-align:right;">${avatarEl(u, 40)}</div>
+      </div>
+      <div style="margin-bottom:1rem;">${avatarEl(u, 36)} <strong>${u?.name}</strong> · ${u?.dept || u?.role}</div>
+      <div class="payslip-row"><span>Basic Salary</span><span>${fmtMoney(p.baseSalary)}</span></div>
+      <div class="payslip-row"><span>Overtime</span><span style="color:#f97316;">+${fmtMoney(p.overtime)}</span></div>
+      <div class="payslip-row"><span>Bonus</span><span style="color:#34d399;">+${fmtMoney(p.bonus)}</span></div>
+      <div class="payslip-row"><span>Allowances</span><span>+${fmtMoney(p.allowances)}</span></div>
+      <div class="payslip-row"><span>Deductions</span><span style="color:#f87171;">-${fmtMoney(p.deductions)}</span></div>
+      <hr class="div">
+      <div class="payslip-row payslip-total"><span>Net Pay</span><span>${fmtMoney(netPay(p))}</span></div>
+      <div style="margin-top:0.75rem;font-size:0.72rem;color:var(--text3);">Status: ${statusBadge(p.status)}</div>
+    </div>`;
+  
+  $('payslipPrintBtn').onclick = () => window.print();
+  $('payslipEmailBtn').onclick = () => emailPayslip(prId);
   openM('payslipModal');
 }
 
 function emailPayslip(prId) {
-  const p=DB.payroll.find(x=>x.id===prId); const u=userById(p?.userId);
-  sendEmail(u?.email||'','Your Payslip is Ready','payslip');
-  toast(`Payslip emailed to ${u?.name}`,'success');
+  const p = DB.payroll.find(x => x.id === prId); 
+  const u = userById(p?.userId);
+  if (u?.email) {
+    sendEmail(u.email, 'Your Payslip is Ready', 'payslip');
+    toast(`Payslip emailed to ${u.name}`, 'success');
+  } else {
+    toast('No email address found for this employee', 'error');
+  }
 }
 
 /* ============================================================
@@ -1587,12 +2139,12 @@ function emailPayslip(prId) {
 function renderTasks() {
   populateProjectSelects();
   wireTTabs();
-  renderProjectTable();
+  filterAndUpdateProjects(); // Changed from renderProjectTable()
   renderKanban();
   renderGantt();
-   if ($('addProjectBtn')) $('addProjectBtn').onclick = () => openProjectModal();
-  if ($('projSearch')) $('projSearch').oninput = renderProjectTable;
-  if ($('projStatus')) $('projStatus').onchange = renderProjectTable;
+  if ($('addProjectBtn')) $('addProjectBtn').onclick = () => openProjectModal();
+  if ($('projSearch')) $('projSearch').oninput = filterAndUpdateProjects;
+  if ($('projStatus')) $('projStatus').onchange = filterAndUpdateProjects;
   ['kanbanProject','kanbanAssignee','kanbanPriority'].forEach(id => { if ($(id)) $(id).onchange = renderKanban; });
   $$('.kanban-add-btn').forEach(btn => { btn.onclick = () => openTaskModal(null, btn.dataset.col); });
 }
@@ -1601,9 +2153,9 @@ function populateProjectSelects() {
   const kp=$('kanbanProject'); if(kp) kp.innerHTML='<option value="">All Projects</option>'+DB.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
   const ka=$('kanbanAssignee'); if(ka) ka.innerHTML='<option value="">All Assignees</option>'+DB.users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
   const tmProj=$('tm_project'); if(tmProj) tmProj.innerHTML=DB.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  
   const projSite=$('proj_site'); if(projSite) projSite.innerHTML='<option value="">None</option>'+DB.sites.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
 }
+
 function renderAssignTags(ids, targetId, removeFn) {
   const target = $(targetId);
   if (!target) return;
@@ -1621,12 +2173,14 @@ function searchProjectTeam(q='') {
   res.innerHTML = options.map(u=>`<div class="assign-opt" onclick="addProjectTeamMember(${u.id})">${avatarEl(u,24)}<span>${u.name}</span></div>`).join('') || '<div style="padding:0.5rem;color:var(--text3);font-size:0.8rem;">No results</div>';
   res.classList.add('show');
 }
+
 function addProjectTeamMember(id) {
   if (!projectTeamMembers.includes(id)) projectTeamMembers.push(id);
   renderAssignTags(projectTeamMembers, 'proj_teamTags', 'removeProjectTeamMember');
   $('proj_teamResults')?.classList.remove('show');
   if ($('proj_teamSearch')) $('proj_teamSearch').value = '';
 }
+
 function removeProjectTeamMember(id) {
   projectTeamMembers = projectTeamMembers.filter(x => x !== id);
   renderAssignTags(projectTeamMembers, 'proj_teamTags', 'removeProjectTeamMember');
@@ -1640,25 +2194,30 @@ function searchTaskAssignees(q='') {
   res.innerHTML = options.map(u=>`<div class="assign-opt" onclick="addTaskAssignee(${u.id})">${avatarEl(u,24)}<span>${u.name}</span></div>`).join('') || '<div style="padding:0.5rem;color:var(--text3);font-size:0.8rem;">No results</div>';
   res.classList.add('show');
 }
+
 function addTaskAssignee(id) {
   if (!taskAssignees.includes(id)) taskAssignees.push(id);
   renderAssignTags(taskAssignees, 'tm_assigneeTags', 'removeTaskAssignee');
   $('tm_assigneeResults')?.classList.remove('show');
   if ($('tm_assigneeSearch')) $('tm_assigneeSearch').value = '';
 }
+
 function removeTaskAssignee(id) {
   taskAssignees = taskAssignees.filter(x => x !== id);
   renderAssignTags(taskAssignees, 'tm_assigneeTags', 'removeTaskAssignee');
 }
+
 function renderTaskAttachments() {
   const box = $('tm_attFiles');
   if (!box) return;
   box.innerHTML = taskAttachments.map((f, i) => `<div class="af-item"><i class="fas fa-file"></i><span>${f.name}</span><button class="abt dan" onclick="removeTaskAttachment(${i})"><i class="fas fa-times"></i></button></div>`).join('') || '<div style="font-size:0.78rem;color:var(--text3);">No attachments added</div>';
 }
+
 function removeTaskAttachment(index) {
   taskAttachments.splice(index, 1);
   renderTaskAttachments();
 }
+
 function toggleTaskVoice() {
   taskVoiceRecording = !taskVoiceRecording;
   const btn = $('tm_voiceBtn');
@@ -1667,6 +2226,7 @@ function toggleTaskVoice() {
   if ($('tm_voiceStatus')) $('tm_voiceStatus').style.display = taskVoiceRecording ? '' : 'none';
   toast(taskVoiceRecording ? 'Voice recording started (demo)' : 'Voice recording stopped', 'info');
 }
+
 function wireTTabs() {
   const panels={'projects':'tt-projects','kanban':'tt-kanban','gantt':'tt-gantt'};
   $$('[data-ttab]').forEach(btn=>{
@@ -1678,67 +2238,119 @@ function wireTTabs() {
   });
 }
 
-function renderProjectTable() {
-  const q=$('projSearch')?.value.toLowerCase()||'';
-  const st=$('projStatus')?.value||'';
-  const rows=DB.projects.filter(p=>{
-    if(q&&!p.name.toLowerCase().includes(q)) return false;
-    if(st&&p.status!==st) return false;
+// NEW: Function to filter projects and apply pagination
+function filterAndUpdateProjects() {
+  const q = $('projSearch')?.value.toLowerCase() || '';
+  const st = $('projStatus')?.value || '';
+  
+  const filteredProjects = DB.projects.filter(p => {
+    if (q && !p.name.toLowerCase().includes(q)) return false;
+    if (st && p.status !== st) return false;
     return true;
   });
-  $('projTbody').innerHTML=rows.map(p=>{
-    const tasks=DB.tasks.filter(t=>t.projectId===p.id);
-    const done=tasks.filter(t=>t.status==='done').length;
-    return `<tr>
-      <td style="font-weight:600;">${p.name}</td>
-      <td><div style="display:flex;gap:-6px;">${p.teamIds.slice(0,3).map(id=>avatarEl(userById(id),26)).join('')}${p.teamIds.length>3?`<span style="font-size:0.72rem;color:var(--text3);padding-left:4px;">+${p.teamIds.length-3}</span>`:''}</div></td>
-      <td><div style="display:flex;align-items:center;gap:0.5rem;min-width:80px;"><div class="pb" style="flex:1;height:6px;"><div class="pb-fill" style="width:${p.progress}%;"></div></div><span style="font-size:0.72rem;">${p.progress}%</span></div></td>
-      <td>${priorityBadge(p.priority)}</td>
-      <td style="font-size:0.78rem;">${fmt(p.dueDate)}</td>
-      <td style="font-size:0.82rem;">${done}/${tasks.length}</td>
-      <td>${statusBadge(p.status)}</td>
-      <td>
-        <button class="abt warn" onclick="openProjectModal(${p.id})"><i class="fas fa-pen"></i></button>
-        <button class="abt dan" onclick="deleteProject(${p.id})"><i class="fas fa-trash"></i></button>
-      </td>
-    </tr>`;
-  }).join('')||'<tr><td colspan="8"><div class="empty-state"><i class="fas fa-folder-open"></i>No projects</div></td></tr>';
+  
+  // Create paginator for projects table
+  createPaginator('projTbody', filteredProjects, (data) => {
+    renderProjectTableBody(data);
+  }, { perPage: 10 });
+}
+
+// NEW: Function to render only the table body (without pagination logic)
+function renderProjectTableBody(projects) {
+  if (!projects.length) {
+    $('projTbody').innerHTML = '<tr><td colspan="8"><div class="empty-state"><i class="fas fa-folder-open"></i>No projects found</div></td></tr>';
+    return;
+  }
+  
+  $('projTbody').innerHTML = projects.map(p => {
+    const tasks = DB.tasks.filter(t => t.projectId === p.id);
+    const done = tasks.filter(t => t.status === 'done').length;
+    return `
+      <tr>
+        <td style="font-weight:600;">${p.name}</td>
+        <td>
+          <div style="display:flex;gap:-6px;">
+            ${(p.teamIds || []).slice(0,3).map(id => avatarEl(userById(id), 26)).join('')}
+            ${(p.teamIds || []).length > 3 ? `<span style="font-size:0.72rem;color:var(--text3);padding-left:4px;">+${p.teamIds.length - 3}</span>` : ''}
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.5rem;min-width:80px;">
+            <div class="pb" style="flex:1;height:6px;"><div class="pb-fill" style="width:${p.progress}%;"></div></div>
+            <span style="font-size:0.72rem;">${p.progress}%</span>
+          </div>
+        </td>
+        <td>${priorityBadge(p.priority)}</td>
+        <td style="font-size:0.78rem;">${fmt(p.dueDate)}</td>
+        <td style="font-size:0.82rem;">${done}/${tasks.length}</td>
+        <td>${statusBadge(p.status)}</td>
+        <td>
+          <button class="abt warn" onclick="openProjectModal(${p.id})"><i class="fas fa-pen"></i></button>
+          <button class="abt dan" onclick="deleteProject(${p.id})"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// Keep original function for compatibility (if called elsewhere)
+function renderProjectTable() {
+  filterAndUpdateProjects();
 }
 
 function openProjectModal(projId=null) {
   populateProjectSelects();
-  const p=projId?projectById(projId):null;
-  $('projTitle').textContent=p?'Edit Project':'New Project';
-  $('proj_name').value=p?.name||'';
-  $('proj_status').value=p?.status||'planning';
-  $('proj_priority').value=p?.priority||'medium';
-  $('proj_due').value=p?.dueDate||'';
-    $('proj_site').value=p?.siteId||'';
-  $('proj_desc').value=p?.desc||'';
-   projectTeamMembers = [...(p?.teamIds||[])];
+  const p = projId ? projectById(projId) : null;
+  $('projTitle').textContent = p ? 'Edit Project' : 'New Project';
+  $('proj_name').value = p?.name || '';
+  $('proj_status').value = p?.status || 'planning';
+  $('proj_priority').value = p?.priority || 'medium';
+  $('proj_due').value = p?.dueDate || '';
+  $('proj_site').value = p?.siteId || '';
+  $('proj_desc').value = p?.desc || '';
+  projectTeamMembers = [...(p?.teamIds || [])];
   renderAssignTags(projectTeamMembers, 'proj_teamTags', 'removeProjectTeamMember');
   if ($('proj_teamSearch')) {
     $('proj_teamSearch').oninput = e => searchProjectTeam(e.target.value);
     $('proj_teamSearch').onfocus = e => searchProjectTeam(e.target.value);
   }
-  $('proj_save').onclick=()=>saveProject(projId);
+  $('proj_save').onclick = () => saveProject(projId);
   openM('projectModal');
 }
 
 function saveProject(projId) {
-   const current = projId ? projectById(projId) : null;
-  const data={name:$('proj_name').value.trim(),status:$('proj_status').value,priority:$('proj_priority').value,dueDate:$('proj_due').value,desc:$('proj_desc').value.trim(),siteId:+$('proj_site')?.value||null,teamIds:[...projectTeamMembers],progress:current?.progress||0};
-  if(!data.name){toast('Name required','error');return;}
-  if(projId){Object.assign(projectById(projId),data);logAction('update',`Project #${projId}`,`Updated ${data.name}`);}
-  else{DB.projects.push({id:generateId('projects'),...data});logAction('create','Project',`Created ${data.name}`);}
-  closeM('projectModal');renderProjectTable();renderKanban();renderGantt();toast('Project saved','success');
+  const current = projId ? projectById(projId) : null;
+  const data = {
+    name: $('proj_name').value.trim(),
+    status: $('proj_status').value,
+    priority: $('proj_priority').value,
+    dueDate: $('proj_due').value,
+    desc: $('proj_desc').value.trim(),
+    siteId: +$('proj_site')?.value || null,
+    teamIds: [...projectTeamMembers],
+    progress: current?.progress || 0
+  };
+  if (!data.name) { toast('Name required', 'error'); return; }
+  if (projId) {
+    Object.assign(projectById(projId), data);
+    logAction('update', `Project #${projId}`, `Updated ${data.name}`);
+  } else {
+    DB.projects.push({ id: generateId('projects'), ...data });
+    logAction('create', 'Project', `Created ${data.name}`);
+  }
+  closeM('projectModal');
+  filterAndUpdateProjects(); // Refresh with pagination
+  renderKanban();
+  renderGantt();
+  toast('Project saved', 'success');
 }
 
-function deleteProject(id){
-  if(!confirm('Delete this project?'))return;
-  DB.projects.splice(DB.projects.findIndex(p=>p.id===id),1);
-  DB.tasks=DB.tasks.filter(t=>t.projectId!==id);
-  renderProjectTable();renderKanban();toast('Project deleted','success');
+function deleteProject(id) {
+  if (!confirm('Delete this project?')) return;
+  DB.projects.splice(DB.projects.findIndex(p => p.id === id), 1);
+  DB.tasks = DB.tasks.filter(t => t.projectId !== id);
+  filterAndUpdateProjects(); // Refresh with pagination
+  renderKanban();
+  toast('Project deleted', 'success');
 }
 
 function renderKanban() {
@@ -1897,85 +2509,204 @@ function renderShiftSwaps() {
    ============================================================ */
 function renderEquipment() {
   populateEqSelects();
-  renderEqTable();
-  $('addEqBtn')?.addEventListener('click',()=>openEqModal());
-  $('eqExport')?.addEventListener('click',()=>exportCSV(DB.equipment,'equipment.csv'));
-  ['eqSearch','eqCondition','eqStatus2'].forEach(id=>$(id)?.addEventListener('input',renderEqTable));
+  filterAndUpdateEquipment(); // Changed from renderEqTable()
+  filterAndUpdateCheckoutRequests(); // Added for checkout requests
+  $('addEqBtn')?.addEventListener('click', () => openEqModal());
+  $('eqExport')?.addEventListener('click', () => exportCSV(DB.equipment, 'equipment.csv'));
+  ['eqSearch', 'eqCondition', 'eqStatus2'].forEach(id => $(id)?.addEventListener('input', filterAndUpdateEquipment));
 }
 
-function populateEqSelects(){
-  const eqAss=$('eq_assignee'); if(eqAss) eqAss.innerHTML='<option value="">Unassigned</option>'+DB.users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
-  const eqSite=$('eq_site'); if(eqSite) eqSite.innerHTML='<option value="">No Site</option>'+DB.sites.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+function populateEqSelects() {
+  const eqAss = $('eq_assignee');
+  if (eqAss) eqAss.innerHTML = '<option value="">Unassigned</option>' + DB.users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+  const eqSite = $('eq_site');
+  if (eqSite) eqSite.innerHTML = '<option value="">No Site</option>' + DB.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 }
 
-function renderEqTable() {
-  const q=$('eqSearch')?.value.toLowerCase()||'';
-  const cond=$('eqCondition')?.value||'';
-  const st=$('eqStatus2')?.value||'';
-  const rows=DB.equipment.filter(e=>{
-    if(q&&!e.name.toLowerCase().includes(q)&&!e.serial.toLowerCase().includes(q))return false;
-    if(cond&&e.condition!==cond)return false;
-    if(st&&e.status!==st)return false;
+// ========== EQUIPMENT TABLE (with pagination) ==========
+function filterAndUpdateEquipment() {
+  const q = $('eqSearch')?.value.toLowerCase() || '';
+  const cond = $('eqCondition')?.value || '';
+  const st = $('eqStatus2')?.value || '';
+  
+  const filteredEquipment = DB.equipment.filter(e => {
+    if (q && !e.name.toLowerCase().includes(q) && !e.serial.toLowerCase().includes(q)) return false;
+    if (cond && e.condition !== cond) return false;
+    if (st && e.status !== st) return false;
     return true;
   });
-  const avail=DB.equipment.filter(e=>e.status==='available').length;
-  const out=DB.equipment.filter(e=>e.status==='checked-out').length;
-  const maint=DB.equipment.filter(e=>e.status==='maintenance').length;
-  $('eqStats').innerHTML=
-    statCard('fa-toolbox','blue',DB.equipment.length,'Total Items','','flat')+
-    statCard('fa-check','green',avail,'Available','','flat')+
-    statCard('fa-hand-holding','yellow',out,'Checked Out','','flat')+
-    statCard('fa-wrench','orange',maint,'In Maintenance','','flat');
-  $('eqTbody').innerHTML=rows.map(e=>{
-    const u=userById(e.assigneeId);
-    const s=siteById(e.siteId);
-    const serviceAlert=e.nextService&&new Date(e.nextService)<new Date()?'color:#f87171;':'';
-    return `<tr>
-      <td style="font-weight:600;">${e.name}</td>
-      <td style="font-size:0.78rem;">${e.category}</td>
-      <td><div style="display:flex;align-items:center;gap:0.4rem;"><code style="font-size:0.72rem;">${e.serial}</code><button class="abt" onclick="showQR('${e.serial}','${e.name}')" title="QR"><i class="fas fa-qrcode"></i></button></div></td>
-      <td>${statusBadge(e.condition==='good'?'good':e.condition==='fair'?'fair':'damaged')}</td>
-      <td>${u?`<div class="user-cell">${avatarEl(u,24)}<span style="font-size:0.8rem;">${u.name}</span></div>`:'<span style="color:var(--text3);">—</span>'}</td>
-      <td style="font-size:0.78rem;">${s?.name||'—'}</td>
-      <td>${statusBadge(e.status==='available'?'active':e.status==='checked-out'?'in-progress':'on-hold')}</td>
-      <td style="font-size:0.75rem;${serviceAlert}">${fmt(e.nextService)}</td>
-      <td>
-        <button class="abt warn" onclick="openEqModal(${e.id})"><i class="fas fa-pen"></i></button>
-        <button class="abt dan" onclick="deleteEq(${e.id})"><i class="fas fa-trash"></i></button>
-      </td>
-    </tr>`;
-  }).join('')||'<tr><td colspan="9"><div class="empty-state"><i class="fas fa-toolbox"></i>No equipment found</div></td></tr>';
-  $('eqReqTbody').innerHTML='<tr><td colspan="6"><div class="empty-state"><i class="fas fa-hand-holding"></i>No checkout requests</div></td></tr>';
+  
+  // Update equipment stats
+  updateEquipmentStats();
+  
+  // Create paginator for equipment table
+  if (filteredEquipment.length >= 0) {
+    createPaginator('eqTbody', filteredEquipment, (data) => {
+      renderEquipmentBody(data);
+    }, { perPage: 10 });
+  }
 }
 
-function openEqModal(eqId=null){
+function updateEquipmentStats() {
+  const avail = DB.equipment.filter(e => e.status === 'available').length;
+  const out = DB.equipment.filter(e => e.status === 'checked-out').length;
+  const maint = DB.equipment.filter(e => e.status === 'maintenance').length;
+  
+  $('eqStats').innerHTML =
+    statCard('fa-toolbox', 'blue', DB.equipment.length, 'Total Items', '', 'flat') +
+    statCard('fa-check', 'green', avail, 'Available', '', 'flat') +
+    statCard('fa-hand-holding', 'yellow', out, 'Checked Out', '', 'flat') +
+    statCard('fa-wrench', 'orange', maint, 'In Maintenance', '', 'flat');
+}
+
+function renderEquipmentBody(equipment) {
+  if (!equipment.length) {
+    $('eqTbody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-toolbox"></i>No equipment found</div></td></tr>';
+    return;
+  }
+  
+  $('eqTbody').innerHTML = equipment.map(e => {
+    const u = userById(e.assigneeId);
+    const s = siteById(e.siteId);
+    const serviceAlert = e.nextService && new Date(e.nextService) < new Date() ? 'color:#f87171;' : '';
+    let conditionBadge = 'good';
+    if (e.condition === 'good') conditionBadge = 'good';
+    else if (e.condition === 'fair') conditionBadge = 'fair';
+    else if (e.condition === 'damaged') conditionBadge = 'damaged';
+    
+    let statusBadgeClass = 'active';
+    if (e.status === 'available') statusBadgeClass = 'active';
+    else if (e.status === 'checked-out') statusBadgeClass = 'in-progress';
+    else if (e.status === 'maintenance') statusBadgeClass = 'on-hold';
+    
+    return `
+      <tr>
+        <td style="font-weight:600;">${e.name}</td>
+        <td style="font-size:0.78rem;">${e.category}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.4rem;">
+            <code style="font-size:0.72rem;">${e.serial}</code>
+            <button class="abt" onclick="showQR('${e.serial}', '${e.name}')" title="QR"><i class="fas fa-qrcode"></i></button>
+          </div>
+        </td>
+        <td>${statusBadge(conditionBadge)}</td>
+        <td>${u ? `<div class="user-cell">${avatarEl(u, 24)}<span style="font-size:0.8rem;">${u.name}</span></div>` : '<span style="color:var(--text3);">—</span>'}</td>
+        <td style="font-size:0.78rem;">${s?.name || '—'}</td>
+        <td>${statusBadge(statusBadgeClass)}</td>
+        <td style="font-size:0.75rem;${serviceAlert}">${fmt(e.nextService)}</td>
+        <td>
+          <button class="abt warn" onclick="openEqModal(${e.id})"><i class="fas fa-pen"></i></button>
+          <button class="abt dan" onclick="deleteEq(${e.id})"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// Keep original for compatibility
+function renderEqTable() {
+  filterAndUpdateEquipment();
+}
+
+// ========== CHECKOUT REQUESTS TABLE (with pagination) ==========
+function filterAndUpdateCheckoutRequests() {
+  // Sample checkout requests data - you can replace with actual data from DB
+  const checkoutRequests = [
+    // Add your checkout request data here
+    // Example: { id: 1, item: 'Drill', requestedBy: 'John Doe', date: '2025-01-15', purpose: 'Site work', status: 'pending' }
+  ];
+  
+  if (checkoutRequests.length >= 0) {
+    createPaginator('eqReqTbody', checkoutRequests, (data) => {
+      renderCheckoutRequestsBody(data);
+    }, { perPage: 10 });
+  } else {
+    $('eqReqTbody').innerHTML = '<tr><td colspan="6"><div class="empty-state"><i class="fas fa-hand-holding"></i>No checkout requests</div></td></tr>';
+  }
+}
+
+function renderCheckoutRequestsBody(requests) {
+  if (!requests.length) {
+    $('eqReqTbody').innerHTML = '<tr><td colspan="6"><div class="empty-state"><i class="fas fa-hand-holding"></i>No checkout requests found</div></td></tr>';
+    return;
+  }
+  
+  $('eqReqTbody').innerHTML = requests.map(r => `
+    <tr>
+      <td style="font-weight:600;">${r.item}</td>
+      <td>${r.requestedBy}</td>
+      <td style="font-size:0.75rem;">${fmt(r.date)}</td>
+      <td style="font-size:0.8rem;">${r.purpose}</td>
+      <td>${statusBadge(r.status === 'pending' ? 'pending' : (r.status === 'approved' ? 'active' : 'inactive'))}</td>
+      <td>
+        <button class="abt suc" onclick="approveCheckout(${r.id})" title="Approve"><i class="fas fa-check"></i></button>
+        <button class="abt dan" onclick="rejectCheckout(${r.id})" title="Reject"><i class="fas fa-times"></i></button>
+      </td>
+    </tr>`).join('');
+}
+
+// Functions for checkout request actions
+function approveCheckout(requestId) {
+  toast(`Checkout request #${requestId} approved`, 'success');
+  filterAndUpdateCheckoutRequests();
+}
+
+function rejectCheckout(requestId) {
+  toast(`Checkout request #${requestId} rejected`, 'warn');
+  filterAndUpdateCheckoutRequests();
+}
+
+function openEqModal(eqId = null) {
   populateEqSelects();
-  const e=eqId?DB.equipment.find(x=>x.id===eqId):null;
-  $('eqTitle').textContent=e?'Edit Equipment':'Add Equipment';
-  $('eq_name').value=e?.name||'';
-  $('eq_cat').value=e?.category||'';
-  $('eq_serial').value=e?.serial||'';
-  $('eq_condition').value=e?.condition||'good';
-  $('eq_assignee').value=e?.assigneeId||'';
-  $('eq_site').value=e?.siteId||'';
-  $('eq_service').value=e?.nextService||'';
-  $('eq_status').value=e?.status||'available';
-  $('eq_save').onclick=()=>saveEq(eqId);
+  const e = eqId ? DB.equipment.find(x => x.id === eqId) : null;
+  $('eqTitle').textContent = e ? 'Edit Equipment' : 'Add Equipment';
+  $('eq_name').value = e?.name || '';
+  $('eq_cat').value = e?.category || '';
+  $('eq_serial').value = e?.serial || '';
+  $('eq_condition').value = e?.condition || 'good';
+  $('eq_assignee').value = e?.assigneeId || '';
+  $('eq_site').value = e?.siteId || '';
+  $('eq_service').value = e?.nextService || '';
+  $('eq_status').value = e?.status || 'available';
+  $('eq_save').onclick = () => saveEq(eqId);
   openM('equipModal');
 }
 
-function saveEq(eqId){
-  const data={name:$('eq_name').value.trim(),category:$('eq_cat').value.trim(),serial:$('eq_serial').value.trim(),condition:$('eq_condition').value,assigneeId:+$('eq_assignee').value||null,siteId:+$('eq_site').value||null,nextService:$('eq_service').value,status:$('eq_status').value};
-  if(!data.name){toast('Name required','error');return;}
-  if(eqId){Object.assign(DB.equipment.find(e=>e.id===eqId),data);}
-  else{DB.equipment.push({id:generateId('equipment'),...data});logAction('create','Equipment',`Added ${data.name}`);}
-  closeM('equipModal');renderEqTable();toast('Equipment saved','success');
+function saveEq(eqId) {
+  const data = {
+    name: $('eq_name').value.trim(),
+    category: $('eq_cat').value.trim(),
+    serial: $('eq_serial').value.trim(),
+    condition: $('eq_condition').value,
+    assigneeId: +$('eq_assignee').value || null,
+    siteId: +$('eq_site').value || null,
+    nextService: $('eq_service').value,
+    status: $('eq_status').value
+  };
+  if (!data.name) {
+    toast('Name required', 'error');
+    return;
+  }
+  if (eqId) {
+    Object.assign(DB.equipment.find(e => e.id === eqId), data);
+    logAction('update', 'Equipment', `Updated ${data.name}`);
+  } else {
+    DB.equipment.push({ id: generateId('equipment'), ...data });
+    logAction('create', 'Equipment', `Added ${data.name}`);
+  }
+  closeM('equipModal');
+  filterAndUpdateEquipment();
+  toast('Equipment saved', 'success');
 }
 
-function deleteEq(id){if(!confirm('Delete?'))return;DB.equipment.splice(DB.equipment.findIndex(e=>e.id===id),1);renderEqTable();toast('Equipment deleted','success');}
+function deleteEq(id) {
+  if (!confirm('Delete this equipment?')) return;
+  DB.equipment.splice(DB.equipment.findIndex(e => e.id === id), 1);
+  filterAndUpdateEquipment();
+  toast('Equipment deleted', 'success');
+}
 
-function showQR(serial,name){
-  $('qrBody').innerHTML=`
+function showQR(serial, name) {
+  $('qrBody').innerHTML = `
     <div style="font-weight:700;margin-bottom:1rem;">${name}</div>
     <div style="font-size:4rem;margin:1rem 0;">📦</div>
     <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.1rem;letter-spacing:3px;">${serial}</div>
@@ -1987,65 +2718,121 @@ function showQR(serial,name){
    26. DOCUMENTS
    ============================================================ */
 function renderDocuments(){
-  renderDocTable();
+  filterAndUpdateDocuments(); // Changed from renderDocTable()
   $('uploadDocBtn')?.addEventListener('click',()=>toast('Document upload (demo — connect file server)','info'));
   $('docExport')?.addEventListener('click',()=>exportCSV(DB.documents,'documents.csv'));
-  ['docSearch','docUser','docStatus'].forEach(id=>$(id)?.addEventListener('input',renderDocTable));
+  ['docSearch','docUser','docStatus'].forEach(id => $(id)?.addEventListener('input', filterAndUpdateDocuments));
 }
 
-function renderDocTable(){
-  const q=$('docSearch')?.value.toLowerCase()||'';
-  const uid=+$('docUser')?.value||0;
-  const st=$('docStatus')?.value||'';
-  const today=nowStr().slice(0,10);
-  const rows=DB.documents.filter(d=>{
-    if(q&&!d.name.toLowerCase().includes(q))return false;
-    if(uid&&d.userId!==uid)return false;
-    if(st==='expiring'){const exp=d.expiry;const diff=(new Date(exp)-new Date())/86400000;return diff>=0&&diff<=30;}
-    if(st&&d.status!==st)return false;
+// New function to filter and paginate documents
+function filterAndUpdateDocuments() {
+  const q = $('docSearch')?.value.toLowerCase() || '';
+  const uid = +$('docUser')?.value || 0;
+  const st = $('docStatus')?.value || '';
+  
+  const filteredDocs = DB.documents.filter(d => {
+    if (q && !d.name.toLowerCase().includes(q)) return false;
+    if (uid && d.userId !== uid) return false;
+    if (st === 'expiring') {
+      const exp = d.expiry;
+      const diff = (new Date(exp) - new Date()) / 86400000;
+      return diff >= 0 && diff <= 30;
+    }
+    if (st && d.status !== st) return false;
     return true;
   });
-  const approved=DB.documents.filter(d=>d.status==='approved').length;
-  const pending=DB.documents.filter(d=>d.status==='pending').length;
-  const expiring=DB.documents.filter(d=>{const diff=(new Date(d.expiry)-new Date())/86400000;return diff>=0&&diff<=30;}).length;
-  $('docStats').innerHTML=
-    statCard('fa-folder-open','blue',DB.documents.length,'Total Docs','','flat')+
-    statCard('fa-check','green',approved,'Approved','','flat')+
-    statCard('fa-hourglass','yellow',pending,'Pending Review','','flat')+
-    statCard('fa-triangle-exclamation','orange',expiring,'Expiring Soon','','flat');
-  $('docTbody').innerHTML=rows.map(d=>{
-    const u=userById(d.userId);
-    const diff=(new Date(d.expiry)-new Date())/86400000;
-    const expiryCls=diff<0?'color:#f87171;':diff<30?'color:#f97316;':'';
-    return `<tr>
-      <td><div class="user-cell">${avatarEl(u,26)}<span>${u?.name}</span></div></td>
-      <td style="font-weight:600;">${d.name}</td>
-      <td><span class="badge b-update">${d.type}</span></td>
-      <td style="font-size:0.75rem;">${fmt(d.uploaded)}</td>
-      <td style="font-size:0.75rem;${expiryCls}">${fmt(d.expiry)}${diff<30&&diff>=0?' ⚠️':''}</td>
-      <td>${statusBadge(d.status)}</td>
-      <td style="font-size:0.75rem;">${d.notes||'—'}</td>
-      <td>
-        ${d.status==='pending'?`<button class="abt suc" onclick="decideDoc(${d.id},'approved')" title="Approve"><i class="fas fa-check"></i></button><button class="abt dan" onclick="decideDoc(${d.id},'rejected')" title="Reject"><i class="fas fa-times"></i></button>`:''}
-        <button class="abt inf" title="Preview"><i class="fas fa-eye"></i></button>
-        <button class="abt" title="Request doc" onclick="requestDoc(${d.userId})"><i class="fas fa-envelope"></i></button>
-      </td>
-    </tr>`;
-  }).join('')||'<tr><td colspan="8"><div class="empty-state"><i class="fas fa-folder-open"></i>No documents</div></td></tr>';
+  
+  // Update stats based on ALL filtered data (not just current page)
+  updateDocumentStats();
+  
+  // Create paginator for documents table
+  if (filteredDocs.length >= 0) {
+    createPaginator('docTbody', filteredDocs, (data) => {
+      renderDocTableBody(data);
+    }, { perPage: 10 });
+  }
 }
 
-function decideDoc(id,decision){
-  const d=DB.documents.find(x=>x.id===id); if(!d)return;
-  const u=userById(d.userId);
-  d.status=decision; logAction(decision==='approved'?'approve':'reject',`Doc #${id}`,`${decision} "${d.name}" for ${u?.name}`);
-  sendEmail(u?.email||'',`Document ${decision}`,'doc_decision');
-  renderDocTable(); toast(`Document ${decision}`,'success');
+// New function to update document statistics
+function updateDocumentStats() {
+  const approved = DB.documents.filter(d => d.status === 'approved').length;
+  const pending = DB.documents.filter(d => d.status === 'pending').length;
+  const expiring = DB.documents.filter(d => {
+    const diff = (new Date(d.expiry) - new Date()) / 86400000;
+    return diff >= 0 && diff <= 30;
+  }).length;
+  
+  $('docStats').innerHTML =
+    statCard('fa-folder-open', 'blue', DB.documents.length, 'Total Docs', '', 'flat') +
+    statCard('fa-check', 'green', approved, 'Approved', '', 'flat') +
+    statCard('fa-hourglass', 'yellow', pending, 'Pending Review', '', 'flat') +
+    statCard('fa-triangle-exclamation', 'orange', expiring, 'Expiring Soon', '', 'flat');
 }
 
-function requestDoc(userId){
-  const u=userById(userId);
-  sendEmail(u?.email||'','Missing Document Request','doc_request');
-  toast(`Document request sent to ${u?.name}`,'info');
+// New function to render only the table body
+function renderDocTableBody(documents) {
+  if (!documents.length) {
+    $('docTbody').innerHTML = '<tr><td colspan="8"><div class="empty-state"><i class="fas fa-folder-open"></i>No documents found</div></td></tr>';
+    return;
+  }
+  
+  $('docTbody').innerHTML = documents.map(d => {
+    const u = userById(d.userId);
+    const diff = (new Date(d.expiry) - new Date()) / 86400000;
+    const expiryCls = diff < 0 ? 'color:#f87171;' : (diff < 30 ? 'color:#f97316;' : '');
+    return `
+      <tr>
+        <td><div class="user-cell">${avatarEl(u,26)}<span>${u?.name || 'Unknown'}</span></div></td>
+        <td style="font-weight:600;">${d.name}</td>
+        <td><span class="badge b-update">${d.type}</span></td>
+        <td style="font-size:0.75rem;">${fmt(d.uploaded)}</td>
+        <td style="font-size:0.75rem;${expiryCls}">${fmt(d.expiry)}${diff < 30 && diff >= 0 ? ' ⚠️' : ''}</td>
+        <td>${statusBadge(d.status)}</td>
+        <td style="font-size:0.75rem;">${d.notes || '—'}</td>
+        <td>
+          ${d.status === 'pending' ? `
+            <button class="abt suc" onclick="decideDoc(${d.id},'approved')" title="Approve"><i class="fas fa-check"></i></button>
+            <button class="abt dan" onclick="decideDoc(${d.id},'rejected')" title="Reject"><i class="fas fa-times"></i></button>
+          ` : ''}
+          <button class="abt inf" title="Preview" onclick="previewDoc(${d.id})"><i class="fas fa-eye"></i></button>
+          <button class="abt" title="Request doc" onclick="requestDoc(${d.userId})"><i class="fas fa-envelope"></i></button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// Keep original function for compatibility (if called elsewhere)
+function renderDocTable() {
+  filterAndUpdateDocuments();
+}
+
+function decideDoc(id, decision) {
+  const d = DB.documents.find(x => x.id === id); 
+  if (!d) return;
+  const u = userById(d.userId);
+  d.status = decision; 
+  logAction(decision === 'approved' ? 'approve' : 'reject', `Doc #${id}`, `${decision} "${d.name}" for ${u?.name}`);
+  sendEmail(u?.email || '', `Document ${decision}`, 'doc_decision');
+  filterAndUpdateDocuments(); // Updated to use paginated version
+  toast(`Document ${decision}`, 'success');
+}
+
+function requestDoc(userId) {
+  const u = userById(userId);
+  if (u?.email) {
+    sendEmail(u.email, 'Missing Document Request', 'doc_request');
+    toast(`Document request sent to ${u.name}`, 'info');
+  } else {
+    toast('No email address found for this user', 'error');
+  }
+}
+
+// Helper function for document preview
+function previewDoc(docId) {
+  const d = DB.documents.find(x => x.id === docId);
+  if (d) {
+    toast(`Previewing: ${d.name} (demo)`, 'info');
+  }
 }
 
 /* ============================================================
@@ -2090,321 +2877,656 @@ function renderNotifPrefs(){
 /* ============================================================
    28. EMAIL CENTER
    ============================================================ */
-function renderEmailCenter(){
+function renderEmailCenter() {
   wireETabs();
-  renderEmailLog();
+  filterAndUpdateEmailLog(); // Changed from renderEmailLog()
   renderEmailTemplates();
-  $('compSendBtn')?.addEventListener('click',sendComposedEmail);
-  $('bulkSendBtn')?.addEventListener('click',sendBulkEmail);
+  $('compSendBtn')?.addEventListener('click', sendComposedEmail);
+  $('bulkSendBtn')?.addEventListener('click', sendBulkEmail);
 }
 
-function wireETabs(){
-  const panels={log:'et-log',compose:'et-compose',bulk:'et-bulk',templates:'et-templates'};
-  $$('[data-etab]').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      $$('[data-etab]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
-      Object.values(panels).forEach(id=>{const el=$(id);if(el)el.style.display='none';});
-      const target=$(panels[btn.dataset.etab]);if(target)target.style.display='';
+function wireETabs() {
+  const panels = { log: 'et-log', compose: 'et-compose', bulk: 'et-bulk', templates: 'et-templates' };
+  $$('[data-etab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('[data-etab]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      Object.values(panels).forEach(id => {
+        const el = $(id);
+        if (el) el.style.display = 'none';
+      });
+      const target = $(panels[btn.dataset.etab]);
+      if (target) target.style.display = '';
+      
+      // Refresh email log when switching to log tab
+      if (btn.dataset.etab === 'log') {
+        filterAndUpdateEmailLog();
+      }
     });
   });
 }
 
-function renderEmailLog(){
-  const st=$('emailLogStatus')?.value||'';
-  const q=$('emailLogSearch')?.value.toLowerCase()||'';
-  const rows=DB.emailLog.filter(e=>{
-    if(st&&e.status!==st)return false;
-    if(q&&!e.to.includes(q)&&!e.subject.toLowerCase().includes(q))return false;
+// New function to filter and paginate email log
+function filterAndUpdateEmailLog() {
+  const st = $('emailLogStatus')?.value || '';
+  const q = $('emailLogSearch')?.value.toLowerCase() || '';
+  
+  const filteredEmails = DB.emailLog.filter(e => {
+    if (st && e.status !== st) return false;
+    if (q && !e.to.includes(q) && !e.subject.toLowerCase().includes(q)) return false;
     return true;
   });
-  $('emailLogTbody').innerHTML=rows.map(e=>`<tr>
-    <td>${e.to}</td><td>${e.subject}</td>
-    <td style="font-size:0.75rem;"><code>${e.template}</code></td>
-    <td style="font-size:0.75rem;">${e.sentAt}</td>
-    <td>${statusBadge(e.status==='sent'?'active':e.status==='failed'?'inactive':'pending')}</td>
-    <td><button class="abt inf" title="Resend" onclick="toast('Email resent','info')"><i class="fas fa-rotate-right"></i></button></td>
-  </tr>`).join('')||'<tr><td colspan="6"><div class="empty-state"><i class="fas fa-inbox"></i>No emails</div></td></tr>';
-  $('emailLogSearch')?.addEventListener('input',renderEmailLog);
-  $('emailLogStatus')?.addEventListener('change',renderEmailLog);
+  
+  // Sort by sent date (newest first)
+  filteredEmails.sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
+  
+  // Create paginator for email log table
+  if (filteredEmails.length >= 0) {
+    createPaginator('emailLogTbody', filteredEmails, (data) => {
+      renderEmailLogBody(data);
+    }, { perPage: 10 });
+  }
+  
+  // Re-attach event listeners for search and filter
+  $('emailLogSearch')?.addEventListener('input', filterAndUpdateEmailLog);
+  $('emailLogStatus')?.addEventListener('change', filterAndUpdateEmailLog);
 }
 
-function sendComposedEmail(){
-  const to=$('compTo')?.value.trim();
-  const subject=$('compSubject')?.value.trim();
-  if(!to||!subject){toast('To and Subject required','error');return;}
-  sendEmail(to,subject,'manual');toast(`Email sent to ${to}`,'success');
-  $('compTo').value=$('compSubject').value=$('compBody').value='';
-  renderEmailLog();
+// New function to render only the table body
+function renderEmailLogBody(emails) {
+  if (!emails.length) {
+    $('emailLogTbody').innerHTML = '<tr><td colspan="6"><div class="empty-state"><i class="fas fa-inbox"></i>No emails found</div></td></tr>';
+    return;
+  }
+  
+  $('emailLogTbody').innerHTML = emails.map(e => `
+    <tr>
+      <td>${e.to}</td>
+      <td>${e.subject}</td>
+      <td style="font-size:0.75rem;"><code>${e.template}</code></td>
+      <td style="font-size:0.75rem;">${e.sentAt}</td>
+      <td>${statusBadge(e.status === 'sent' ? 'active' : (e.status === 'failed' ? 'inactive' : 'pending'))}</td>
+      <td>
+        <button class="abt inf" title="Resend" onclick="resendEmail(${e.id})"><i class="fas fa-rotate-right"></i></button>
+      </td>
+    </tr>`).join('');
 }
 
-function sendBulkEmail(){
-  const targets=[...$('bulkEmailTargets').querySelectorAll('input:checked')].map(i=>i.value);
-  if(!targets.length){toast('Select at least one group','warn');return;}
-  let count=0;
-  if(targets.includes('all')) count=DB.users.length;
-  else targets.forEach(t=>{count+=DB.users.filter(u=>u.role===t).length;});
-  toast(`Bulk email queued for ${count} recipients`,'success');
-  logAction('create','Email',`Bulk email to: ${targets.join(', ')}`);
+// Keep original function for compatibility (if called elsewhere)
+function renderEmailLog() {
+  filterAndUpdateEmailLog();
 }
 
-function renderEmailTemplates(){
-  const templates=[
-    {id:'welcome_approved',name:'Welcome / Approved',desc:'Sent when a user is approved.'},
-    {id:'leave_decision',name:'Leave Decision',desc:'Sent on leave approve/reject.'},
-    {id:'task_assigned',name:'Task Assigned',desc:'Sent when a task is assigned.'},
-    {id:'payslip',name:'Payslip Ready',desc:'Sent when payslip is generated.'},
-    {id:'incident_alert',name:'Critical Incident',desc:'Sent on critical safety incident.'},
-    {id:'doc_request',name:'Document Request',desc:'Sent to request missing documents.'},
-    {id:'ticket_update',name:'Ticket Update',desc:'Sent when a ticket status changes.'},
+function sendComposedEmail() {
+  const to = $('compTo')?.value.trim();
+  const subject = $('compSubject')?.value.trim();
+  if (!to || !subject) {
+    toast('To and Subject required', 'error');
+    return;
+  }
+  sendEmail(to, subject, 'manual');
+  toast(`Email sent to ${to}`, 'success');
+  $('compTo').value = '';
+  $('compSubject').value = '';
+  $('compBody').value = '';
+  filterAndUpdateEmailLog(); // Refresh the email log
+}
+
+function sendBulkEmail() {
+  const targets = [...$('bulkEmailTargets').querySelectorAll('input:checked')].map(i => i.value);
+  if (!targets.length) {
+    toast('Select at least one group', 'warn');
+    return;
+  }
+  let count = 0;
+  if (targets.includes('all')) {
+    count = DB.users.length;
+  } else {
+    targets.forEach(t => {
+      count += DB.users.filter(u => u.role === t).length;
+    });
+  }
+  toast(`Bulk email queued for ${count} recipients`, 'success');
+  logAction('create', 'Email', `Bulk email to: ${targets.join(', ')}`);
+  filterAndUpdateEmailLog(); // Refresh the email log
+}
+
+// New function to resend an email
+function resendEmail(emailId) {
+  const email = DB.emailLog.find(e => e.id === emailId);
+  if (email) {
+    sendEmail(email.to, email.subject, email.template);
+    toast(`Resending email to ${email.to}`, 'info');
+  } else {
+    toast('Email not found', 'error');
+  }
+}
+
+function renderEmailTemplates() {
+  const templates = [
+    { id: 'welcome_approved', name: 'Welcome / Approved', desc: 'Sent when a user is approved.' },
+    { id: 'leave_decision', name: 'Leave Decision', desc: 'Sent on leave approve/reject.' },
+    { id: 'task_assigned', name: 'Task Assigned', desc: 'Sent when a task is assigned.' },
+    { id: 'payslip', name: 'Payslip Ready', desc: 'Sent when payslip is generated.' },
+    { id: 'incident_alert', name: 'Critical Incident', desc: 'Sent on critical safety incident.' },
+    { id: 'doc_request', name: 'Document Request', desc: 'Sent to request missing documents.' },
+    { id: 'ticket_update', name: 'Ticket Update', desc: 'Sent when a ticket status changes.' },
   ];
-  $('emailTemplatesList').innerHTML=templates.map(t=>`<div class="cat-item" style="margin-bottom:0.5rem;">
-    <i class="fas fa-file-lines" style="color:var(--accent);"></i>
-    <div style="flex:1;"><div class="ci-name">${t.name}</div><div style="font-size:0.72rem;color:var(--text3);">${t.desc}</div></div>
-    <code style="font-size:0.68rem;color:var(--text3);">${t.id}</code>
-  </div>`).join('');
+  
+  $('emailTemplatesList').innerHTML = templates.map(t => `
+    <div class="cat-item" style="margin-bottom:0.5rem;">
+      <i class="fas fa-file-lines" style="color:var(--accent);"></i>
+      <div style="flex:1;">
+        <div class="ci-name">${t.name}</div>
+        <div style="font-size:0.72rem;color:var(--text3);">${t.desc}</div>
+      </div>
+      <code style="font-size:0.68rem;color:var(--text3);">${t.id}</code>
+    </div>
+  `).join('');
 }
 
 /* ============================================================
    29. SAFETY & INCIDENTS
    ============================================================ */
-function renderSafety(){
+function renderSafety() {
+   document.querySelectorAll('[id^="st-"]').forEach(el => {
+    el.style.display = 'none';
+  });
+  const overviewEl = document.getElementById('st-overview');
+  if (overviewEl) overviewEl.style.display = 'block';
   wireSTabs();
   renderSafetyOverview();
-  renderInductions();
-  renderHazards();
-  renderIncidentTable();
+  
+  // Only load data for the active tab initially
+  const activeTab = document.querySelector('[data-stab].active');
+  const activeTabName = activeTab?.dataset.stab || 'overview';
+  
+  if (activeTabName === 'inductions') {
+    filterAndUpdateInductions();
+  } else if (activeTabName === 'hazards') {
+    filterAndUpdateHazards();
+  } else if (activeTabName === 'incidents') {
+    filterAndUpdateIncidents();
+  } else if (activeTabName === 'training') {
+    filterAndUpdateTraining();
+  } else {
+    // For overview tab, clear table containers
+    if ($('indTbody')) $('indTbody').innerHTML = '';
+    if ($('hazTbody')) $('hazTbody').innerHTML = '';
+    if ($('incTbody')) $('incTbody').innerHTML = '';
+    if ($('trainingTbody')) $('trainingTbody').innerHTML = '';
+  }
+  
   renderChecklist();
-  renderTraining();
   renderSafetyScores();
   populateSafetySelects();
-  $('reportIncidentBtn')?.addEventListener('click',()=>openM('incidentModal'));
-  $('inc_save')?.addEventListener('click',saveIncident);
-  $('incExport')?.addEventListener('click',()=>exportCSV(DB.incidents,'incidents.csv'));
-  $('addTrainingBtn')?.addEventListener('click',()=>toast('Training record form (demo)','info'));
-  ['incSeverity','incSite'].forEach(id=>$(id)?.addEventListener('change',renderIncidentTable));
-  ['indSearch','indStatus'].forEach(id=>$(id)?.addEventListener('input',renderInductions));
-  ['hazSearch','hazStatus','hazType'].forEach(id=>$(id)?.addEventListener('input',renderHazards));
-  $('hazApply')?.addEventListener('click',renderHazards);
-  $('safeRptGenerate')?.addEventListener('click',generateSafetyExport);
-  if ($('safeRptFrom') && !$('safeRptFrom').value) $('safeRptFrom').value = new Date().toISOString().slice(0,10);
-  if ($('safeRptTo') && !$('safeRptTo').value) $('safeRptTo').value = new Date().toISOString().slice(0,10);
+  
+  $('reportIncidentBtn')?.addEventListener('click', () => openM('incidentModal'));
+  $('inc_save')?.addEventListener('click', saveIncident);
+  $('incExport')?.addEventListener('click', () => exportCSV(DB.incidents, 'incidents.csv'));
+  $('addTrainingBtn')?.addEventListener('click', () => toast('Training record form (demo)', 'info'));
+  
+  ['incSeverity', 'incSite'].forEach(id => $(id)?.addEventListener('change', filterAndUpdateIncidents));
+  ['indSearch', 'indStatus'].forEach(id => $(id)?.addEventListener('input', filterAndUpdateInductions));
+  ['hazSearch', 'hazStatus', 'hazType'].forEach(id => $(id)?.addEventListener('input', filterAndUpdateHazards));
+  
+  $('hazApply')?.addEventListener('click', filterAndUpdateHazards);
+  $('safeRptGenerate')?.addEventListener('click', generateSafetyExport);
+  
+  if ($('safeRptFrom') && !$('safeRptFrom').value) $('safeRptFrom').value = new Date().toISOString().slice(0, 10);
+  if ($('safeRptTo') && !$('safeRptTo').value) $('safeRptTo').value = new Date().toISOString().slice(0, 10);
 }
 
-function wireSTabs(){
-  const panels={overview:'st-overview',inductions:'st-inductions',hazards:'st-hazards',exports:'st-exports',incidents:'st-incidents',checklist:'st-checklist',training:'st-training',score:'st-score'};
-  $$('[data-stab]').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      $$('[data-stab]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
-      Object.values(panels).forEach(id=>{const el=$(id);if(el)el.style.display='none';});
-      const target=$(panels[btn.dataset.stab]);if(target)target.style.display='';
+function wireSTabs() {
+  const panels = {
+    overview: 'st-overview',
+    inductions: 'st-inductions',
+    hazards: 'st-hazards',
+    exports: 'st-exports',
+    incidents: 'st-incidents',
+    checklist: 'st-checklist',
+    training: 'st-training',
+    score: 'st-score'
+  };
+  
+  $$('[data-stab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('[data-stab]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      Object.values(panels).forEach(id => {
+        const el = $(id);
+        if (el) el.style.display = 'none';
+      });
+      
+      const target = $(panels[btn.dataset.stab]);
+      if (target) target.style.display = '';
+      
+      // Load data only when switching to specific tabs
+      const tabName = btn.dataset.stab;
+      if (tabName === 'inductions') {
+        filterAndUpdateInductions();
+      } else if (tabName === 'hazards') {
+        filterAndUpdateHazards();
+      } else if (tabName === 'incidents') {
+        filterAndUpdateIncidents();
+      } else if (tabName === 'training') {
+        filterAndUpdateTraining();
+      }
     });
   });
 }
 
-function populateSafetySelects(){
-  const siteOpts='<option value="">All Sites</option>'+DB.sites.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-   ['incSite','checklistSite','inc_site','safeActiveSite'].forEach(id=>{const el=$(id);if(el)el.innerHTML=siteOpts;});
+function populateSafetySelects() {
+  const siteOpts = '<option value="">All Sites</option>' + DB.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  ['incSite', 'checklistSite', 'inc_site', 'safeActiveSite'].forEach(id => {
+    const el = $(id);
+    if (el) el.innerHTML = siteOpts;
+  });
 }
 
-function renderSafetyOverview(){
-  const openHazards = DB.incidents.filter(i=>i.status==='open').length;
-  const overdueHazards = DB.incidents.filter(i=>i.status==='open' && i.severity!=='low').length;
-  const inducted = DB.users.filter(u=>u.status==='active').length;
+function renderSafetyOverview() {
+  const openHazards = DB.incidents.filter(i => i.status === 'open').length;
+  const overdueHazards = DB.incidents.filter(i => i.status === 'open' && i.severity !== 'low').length;
+  const inducted = DB.users.filter(u => u.status === 'active').length;
   $('safeOverviewStats').innerHTML =
-    statCard('fa-users','blue',DB.users.length,'Total Workers','','flat') +
-    statCard('fa-user-check','green',inducted,'Inducted','','flat') +
-    statCard('fa-triangle-exclamation','red',openHazards,'Open Safety Issues','','flat') +
-    statCard('fa-clock','yellow',overdueHazards,'Overdue Hazards','','flat');
+    statCard('fa-users', 'blue', DB.users.length, 'Total Workers', '', 'flat') +
+    statCard('fa-user-check', 'green', inducted, 'Inducted', '', 'flat') +
+    statCard('fa-triangle-exclamation', 'red', openHazards, 'Open Safety Issues', '', 'flat') +
+    statCard('fa-clock', 'yellow', overdueHazards, 'Overdue Hazards', '', 'flat');
 }
 
-function renderInductions(){
+// ========== INDUCTIONS TABLE (with pagination) ==========
+function filterAndUpdateInductions() {
   const q = ($('indSearch')?.value || '').toLowerCase();
   const st = $('indStatus')?.value || '';
-  const rows = DB.users
-    .filter(u=>u.role!=='admin')
-    .map((u,idx)=>{
-      const statusMap = ['Inducted','Pending Review','In Progress','Not Started','Expired'];
+  
+  let inductionData = DB.users
+    .filter(u => u.role !== 'admin')
+    .map((u, idx) => {
+      const statusMap = ['Inducted', 'Pending Review', 'In Progress', 'Not Started', 'Expired'];
       const status = statusMap[idx % statusMap.length];
-      return { user:u, company:siteById(DB.sites[idx % DB.sites.length]?.id)?.name || 'Main Contractor', status, updated:nowStr().slice(0,10) };
+      return {
+        user: u,
+        company: siteById(DB.sites[idx % DB.sites.length]?.id)?.name || 'Main Contractor',
+        status: status,
+        updated: nowStr().slice(0, 10)
+      };
     })
-    .filter(r => (!q || r.user.name.toLowerCase().includes(q) || r.company.toLowerCase().includes(q)) && (!st || r.status===st));
-  $('indTbody').innerHTML = rows.map(r=>`<tr>
-    <td><div class="user-cell">${avatarEl(r.user,26)}<span>${r.user.name}</span></div></td>
-    <td>${r.company}</td>
-    <td>${statusBadge(r.status.toLowerCase().replace(/\s+/g,'' )==='inducted'?'active':r.status==='Expired'?'inactive':'pending')}</td>
-    <td style="font-size:0.76rem;">${r.updated}</td>
-  </tr>`).join('') || '<tr><td colspan="4"><div class="empty-state"><i class="fas fa-id-card"></i>No inductions found</div></td></tr>';
+    .filter(r => (!q || r.user.name.toLowerCase().includes(q) || r.company.toLowerCase().includes(q)) && (!st || r.status === st));
+  
+  createPaginator('indTbody', inductionData, (data) => {
+    renderInductionsBody(data);
+  }, { perPage: 10 });
 }
 
-function renderHazards(){
+function renderInductionsBody(rows) {
+  if (!rows.length) {
+    $('indTbody').innerHTML = '<tr><td colspan="4"><div class="empty-state"><i class="fas fa-id-card"></i>No inductions found</div></td></tr>';
+    return;
+  }
+  
+  $('indTbody').innerHTML = rows.map(r => `
+    <tr>
+      <td><div class="user-cell">${avatarEl(r.user, 26)}<span>${r.user.name}</span></div></td>
+      <td>${r.company}</td>
+      <td>${statusBadge(r.status.toLowerCase().replace(/\s+/g, '') === 'inducted' ? 'active' : (r.status === 'Expired' ? 'inactive' : 'pending'))}</td>
+      <td style="font-size:0.76rem;">${r.updated}</td>
+    </tr>`).join('');
+}
+
+// Keep original for compatibility
+function renderInductions() {
+  filterAndUpdateInductions();
+}
+
+// ========== HAZARDS TABLE (with pagination) ==========
+function filterAndUpdateHazards() {
   const q = ($('hazSearch')?.value || '').toLowerCase();
   const st = $('hazStatus')?.value || '';
   const type = $('hazType')?.value || '';
-  const rows = DB.incidents.filter(i=>{
-    if (st && i.status!==st) return false;
-    if (type && i.type!==type) return false;
-    if (q && !(`${i.desc} ${siteById(i.siteId)?.name||''}`).toLowerCase().includes(q)) return false;
+  
+  const filteredHazards = DB.incidents.filter(i => {
+    if (st && i.status !== st) return false;
+    if (type && i.type !== type) return false;
+    if (q && !(`${i.desc} ${siteById(i.siteId)?.name || ''}`).toLowerCase().includes(q)) return false;
     return true;
   });
-  $('hazardStats').innerHTML =
-    statCard('fa-folder-open','yellow',DB.incidents.filter(i=>i.status==='open').length,'Open','','flat') +
-    statCard('fa-clock','red',DB.incidents.filter(i=>i.status==='open'&&i.severity!=='low').length,'Overdue','','flat') +
-    statCard('fa-check','green',DB.incidents.filter(i=>i.status==='resolved').length,'Closed','','flat');
-  $('hazTbody').innerHTML = rows.map(i=>`<tr>
-    <td style="font-size:0.75rem;">${i.date}</td>
-    <td>${siteById(i.siteId)?.name||'—'}</td>
-    <td><span class="badge b-update">${i.type}</span></td>
-    <td style="font-size:0.8rem;">${i.desc}</td>
-    <td>${statusBadge(i.status==='open'?'active':'completed')}</td>
-  </tr>`).join('') || '<tr><td colspan="5"><div class="empty-state"><i class="fas fa-triangle-exclamation"></i>No hazards found</div></td></tr>';
+  
+  updateHazardStats();
+  
+  createPaginator('hazTbody', filteredHazards, (data) => {
+    renderHazardsBody(data);
+  }, { perPage: 10 });
 }
 
-function generateSafetyExport(){
+function updateHazardStats() {
+  $('hazardStats').innerHTML =
+    statCard('fa-folder-open', 'yellow', DB.incidents.filter(i => i.status === 'open').length, 'Open', '', 'flat') +
+    statCard('fa-clock', 'red', DB.incidents.filter(i => i.status === 'open' && i.severity !== 'low').length, 'Overdue', '', 'flat') +
+    statCard('fa-check', 'green', DB.incidents.filter(i => i.status === 'resolved').length, 'Closed', '', 'flat');
+}
+
+function renderHazardsBody(hazards) {
+  if (!hazards.length) {
+    $('hazTbody').innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fas fa-triangle-exclamation"></i>No hazards found</div></td></tr>';
+    return;
+  }
+  
+  $('hazTbody').innerHTML = hazards.map(i => `
+    <tr>
+      <td style="font-size:0.75rem;">${i.date}</td>
+      <td>${siteById(i.siteId)?.name || '—'}</td>
+      <td><span class="badge b-update">${i.type}</span></td>
+      <td style="font-size:0.8rem;">${i.desc}</td>
+      <td>${statusBadge(i.status === 'open' ? 'active' : 'completed')}</td>
+    </tr>`).join('');
+}
+
+// Keep original for compatibility
+function renderHazards() {
+  filterAndUpdateHazards();
+}
+
+// ========== INCIDENTS TABLE (with pagination) ==========
+function filterAndUpdateIncidents() {
+  const sev = $('incSeverity')?.value || '';
+  const site = +$('incSite')?.value || 0;
+  
+  const filteredIncidents = DB.incidents.filter(i => {
+    if (sev && i.severity !== sev) return false;
+    if (site && i.siteId !== site) return false;
+    return true;
+  });
+  
+  updateIncidentStats();
+  
+  createPaginator('incTbody', filteredIncidents, (data) => {
+    renderIncidentsBody(data);
+  }, { perPage: 10 });
+}
+
+function updateIncidentStats() {
+  const critical = DB.incidents.filter(i => i.severity === 'critical').length;
+  const open = DB.incidents.filter(i => i.status === 'open').length;
+  const resolved = DB.incidents.filter(i => i.status === 'resolved').length;
+  
+  $('safetyStats').innerHTML =
+    statCard('fa-triangle-exclamation', 'red', DB.incidents.length, 'Total Incidents', '', 'flat') +
+    statCard('fa-skull', 'red', critical, 'Critical', '', 'flat') +
+    statCard('fa-folder-open', 'yellow', open, 'Open', '', 'flat') +
+    statCard('fa-check', 'green', resolved, 'Resolved', '', 'flat');
+}
+
+function renderIncidentsBody(incidents) {
+  if (!incidents.length) {
+    $('incTbody').innerHTML = '<tr><td colspan="8"><div class="empty-state"><i class="fas fa-shield-check"></i>No incidents found</div></td><tr>';
+    return;
+  }
+  
+  $('incTbody').innerHTML = incidents.map(i => {
+    const s = siteById(i.siteId);
+    const r = userById(i.reporterId);
+    return `
+      <tr>
+        <td style="font-size:0.75rem;">${i.date}</td>
+        <td style="font-size:0.8rem;">${s?.name || '—'}</td>
+        <td><div class="user-cell">${avatarEl(r, 24)}<span style="font-size:0.78rem;">${r?.name}</span></div></td>
+        <td><span class="badge b-update">${i.type}</span></td>
+        <td>${severityBadge(i.severity)}</td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.8rem;">${i.desc}</td>
+        <td>${statusBadge(i.status === 'open' ? 'active' : 'completed')}</td>
+        <td>
+          <button class="abt inf" title="Details" onclick="toast('Incident details (demo)', 'info')"><i class="fas fa-eye"></i></button>
+          ${i.status === 'open' ? `<button class="abt suc" title="Resolve" onclick="resolveIncident(${i.id})"><i class="fas fa-check"></i></button>` : ''}
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// Keep original for compatibility
+function renderIncidentTable() {
+  filterAndUpdateIncidents();
+}
+
+function saveIncident() {
+  const data = {
+    date: $('inc_date')?.value || nowStr(),
+    siteId: +$('inc_site')?.value || 1,
+    reporterId: currentUser.id,
+    type: $('inc_type')?.value,
+    severity: $('inc_severity')?.value,
+    desc: $('inc_desc')?.value.trim(),
+    actions: $('inc_actions')?.value.trim(),
+    status: 'open'
+  };
+  if (!data.desc) {
+    toast('Description required', 'error');
+    return;
+  }
+  DB.incidents.unshift({ id: generateId('incidents'), ...data });
+  logAction('create', 'Incident', `${data.severity} incident at site #${data.siteId}`);
+  if (data.severity === 'critical') sendEmail('admin@nixers.pro', 'CRITICAL: Safety Incident Reported', 'incident_alert');
+  closeM('incidentModal');
+  filterAndUpdateIncidents();
+  filterAndUpdateHazards();
+  toast('Incident reported', 'success');
+}
+
+function resolveIncident(id) {
+  const i = DB.incidents.find(x => x.id === id);
+  if (i) i.status = 'resolved';
+  filterAndUpdateIncidents();
+  filterAndUpdateHazards();
+  toast('Incident resolved', 'success');
+}
+
+// ========== TRAINING TABLE (with pagination) ==========
+function filterAndUpdateTraining() {
+  const trainings = [
+    { userId: 3, training: 'Working at Height', completed: '2025-01-15', expiry: '2026-01-15', status: 'valid' },
+    { userId: 4, training: 'First Aid', completed: '2024-06-01', expiry: '2025-06-01', status: 'expired' },
+    { userId: 5, training: 'Fire Safety', completed: '2025-03-10', expiry: '2026-03-10', status: 'valid' },
+    { userId: 6, training: 'Scaffolding Safety', completed: '2025-02-20', expiry: '2026-02-20', status: 'valid' }
+  ];
+  
+  createPaginator('trainingTbody', trainings, (data) => {
+    renderTrainingBody(data);
+  }, { perPage: 10 });
+}
+
+function renderTrainingBody(trainings) {
+  if (!trainings.length) {
+    $('trainingTbody').innerHTML = '<tr><td colspan="6"><div class="empty-state"><i class="fas fa-graduation-cap"></i>No training records found</div></td></tr>';
+    return;
+  }
+  
+  $('trainingTbody').innerHTML = trainings.map(t => {
+    const u = userById(t.userId);
+    return `
+      <tr>
+        <td><div class="user-cell">${avatarEl(u, 26)}<span>${u?.name}</span></div></td>
+        <td>${t.training}</td>
+        <td style="font-size:0.75rem;">${fmt(t.completed)}</td>
+        <td style="font-size:0.75rem;">${fmt(t.expiry)}</td>
+        <td>${statusBadge(t.status === 'valid' ? 'active' : 'inactive')}</td>
+        <td><button class="abt warn" onclick="editTraining(${t.userId})"><i class="fas fa-pen"></i></button></td>
+      </tr>`;
+  }).join('');
+}
+
+// Keep original for compatibility
+function renderTraining() {
+  filterAndUpdateTraining();
+}
+
+function editTraining(userId) {
+  toast(`Edit training record for user #${userId} (demo)`, 'info');
+}
+
+function renderChecklist() {
+  const checks = ['All workers have PPE', 'Emergency exits clear', 'Scaffolding inspected', 'Tools accounted for', 'First aid kit stocked', 'Hazard zones marked', 'Morning briefing done'];
+  $('checklistBody').innerHTML = checks.map((c, i) => `
+    <div class="sw-row">
+      <div class="sw-info"><div class="sw-label">${c}</div></div>
+      <label class="sw"><input type="checkbox" id="chk${i}"><span class="sw-sl"></span></label>
+    </div>`).join('') +
+    `<div style="margin-top:1rem;"><button class="btn btn-accent btn-sm" onclick="submitChecklist()"><i class="fas fa-save"></i> Submit Checklist</button></div>`;
+}
+
+function submitChecklist() {
+  logAction('create', 'Checklist', 'Daily safety checklist submitted');
+  toast('Checklist submitted', 'success');
+}
+
+function renderSafetyScores() {
+  $('safetyScoreBody').innerHTML = DB.sites.map(s => {
+    const incidents = DB.incidents.filter(i => i.siteId === s.id);
+    const score = Math.max(0, 100 - incidents.length * 15);
+    const color = score >= 80 ? '#34d399' : (score >= 60 ? 'var(--accent)' : '#f87171');
+    return `
+      <div class="safety-score-card">
+        <div class="ss-site">${s.name}</div>
+        <div style="display:flex;align-items:center;gap:1rem;">
+          <div class="ss-score" style="color:${color};">${score}</div>
+          <div style="flex:1;">
+            <div class="pb ss-bar"><div class="pb-fill" style="width:${score}%;background:${color};"></div></div>
+            <div style="font-size:0.72rem;color:var(--text3);margin-top:0.25rem;">${incidents.length} incident${incidents.length !== 1 ? 's' : ''} recorded</div>
+          </div>
+        </div>
+      </div>`;
+  }).join('') || '<div class="empty-state"><i class="fas fa-star"></i>No sites found</div>';
+}
+
+function generateSafetyExport() {
   const type = $('safeRptType')?.value;
   const fmt = $('safeRptFmt')?.value || 'csv';
-  if (!type) { toast('Select report type','error'); return; }
-  if (type==='incidents' || type==='hazards') {
-    if (fmt==='json') downloadJSON(DB.incidents, `${type}.json`);
+  if (!type) {
+    toast('Select report type', 'error');
+    return;
+  }
+  if (type === 'incidents' || type === 'hazards') {
+    if (fmt === 'json') downloadJSON(DB.incidents, `${type}.json`);
     else exportCSV(DB.incidents, `${type}.csv`);
   } else {
-    const rows = DB.users.filter(u=>u.role!=='admin').map((u, idx)=>({name:u.name, status:['Inducted','Pending Review','In Progress','Not Started','Expired'][idx%5]}));
-    if (fmt==='json') downloadJSON(rows, 'inductions.json');
+    const rows = DB.users.filter(u => u.role !== 'admin').map((u, idx) => ({ name: u.name, status: ['Inducted', 'Pending Review', 'In Progress', 'Not Started', 'Expired'][idx % 5] }));
+    if (fmt === 'json') downloadJSON(rows, 'inductions.json');
     else exportCSV(rows, 'inductions.csv');
   }
-  toast('Safety export generated','success');
+  toast('Safety export generated', 'success');
 }
 
-function renderIncidentTable(){
-  const sev=$('incSeverity')?.value||'';
-  const site=+$('incSite')?.value||0;
-  const rows=DB.incidents.filter(i=>{if(sev&&i.severity!==sev)return false;if(site&&i.siteId!==site)return false;return true;});
-  const critical=DB.incidents.filter(i=>i.severity==='critical').length;
-  const open=DB.incidents.filter(i=>i.status==='open').length;
-  $('safetyStats').innerHTML=
-    statCard('fa-triangle-exclamation','red',DB.incidents.length,'Total Incidents','','flat')+
-    statCard('fa-skull','red',critical,'Critical','','flat')+
-    statCard('fa-folder-open','yellow',open,'Open','','flat')+
-    statCard('fa-check','green',DB.incidents.filter(i=>i.status==='resolved').length,'Resolved','','flat');
-  $('incTbody').innerHTML=rows.map(i=>{
-    const s=siteById(i.siteId);const r=userById(i.reporterId);
-    return `<tr>
-      <td style="font-size:0.75rem;">${i.date}</td>
-      <td style="font-size:0.8rem;">${s?.name||'—'}</td>
-      <td><div class="user-cell">${avatarEl(r,24)}<span style="font-size:0.78rem;">${r?.name}</span></div></td>
-      <td><span class="badge b-update">${i.type}</span></td>
-      <td>${severityBadge(i.severity)}</td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.8rem;">${i.desc}</td>
-      <td>${statusBadge(i.status==='open'?'active':'completed')}</td>
-      <td>
-        <button class="abt inf" title="Details" onclick="toast('Incident details (demo)','info')"><i class="fas fa-eye"></i></button>
-        ${i.status==='open'?`<button class="abt suc" title="Resolve" onclick="resolveIncident(${i.id})"><i class="fas fa-check"></i></button>`:''}
-      </td>
-    </tr>`;
-  }).join('')||'<tr><td colspan="8"><div class="empty-state"><i class="fas fa-shield-check"></i>No incidents found</div></td></tr>';
-}
-
-function saveIncident(){
-  const data={date:$('inc_date')?.value||nowStr(),siteId:+$('inc_site')?.value||1,reporterId:currentUser.id,type:$('inc_type')?.value,severity:$('inc_severity')?.value,desc:$('inc_desc')?.value.trim(),actions:$('inc_actions')?.value.trim(),status:'open'};
-  if(!data.desc){toast('Description required','error');return;}
-  DB.incidents.unshift({id:generateId('incidents'),...data});
-  logAction('create','Incident',`${data.severity} incident at site #${data.siteId}`);
-  if(data.severity==='critical')sendEmail('admin@nixers.pro','CRITICAL: Safety Incident Reported','incident_alert');
-  closeM('incidentModal');renderIncidentTable();toast('Incident reported','success');
-}
-
-function resolveIncident(id){const i=DB.incidents.find(x=>x.id===id);if(i)i.status='resolved';renderIncidentTable();toast('Incident resolved','success');}
-
-function renderChecklist(){
-  const checks=['All workers have PPE','Emergency exits clear','Scaffolding inspected','Tools accounted for','First aid kit stocked','Hazard zones marked','Morning briefing done'];
-  $('checklistBody').innerHTML=checks.map((c,i)=>`<div class="sw-row"><div class="sw-info"><div class="sw-label">${c}</div></div><label class="sw"><input type="checkbox" id="chk${i}"><span class="sw-sl"></span></label></div>`).join('')+
-  `<div style="margin-top:1rem;"><button class="btn btn-accent btn-sm" onclick="submitChecklist()"><i class="fas fa-save"></i> Submit Checklist</button></div>`;
-}
-
-function submitChecklist(){logAction('create','Checklist','Daily safety checklist submitted');toast('Checklist submitted','success');}
-
-function renderTraining(){
-  const trainings=[{userId:3,training:'Working at Height',completed:'2025-01-15',expiry:'2026-01-15',status:'valid'},{userId:4,training:'First Aid',completed:'2024-06-01',expiry:'2025-06-01',status:'expired'},{userId:5,training:'Fire Safety',completed:'2025-03-10',expiry:'2026-03-10',status:'valid'},{userId:6,training:'Scaffolding Safety',completed:'2025-02-20',expiry:'2026-02-20',status:'valid'}];
-  $('trainingTbody').innerHTML=trainings.map(t=>{const u=userById(t.userId);return`<tr>
-    <td><div class="user-cell">${avatarEl(u,26)}<span>${u?.name}</span></div></td>
-    <td>${t.training}</td>
-    <td style="font-size:0.75rem;">${fmt(t.completed)}</td>
-    <td style="font-size:0.75rem;">${fmt(t.expiry)}</td>
-    <td>${statusBadge(t.status==='valid'?'active':'inactive')}</td>
-    <td><button class="abt warn"><i class="fas fa-pen"></i></button></td>
-  </tr>`;}).join('');
-}
-
-function renderSafetyScores(){
-  $('safetyScoreBody').innerHTML=DB.sites.map(s=>{
-    const incidents=DB.incidents.filter(i=>i.siteId===s.id);
-    const score=Math.max(0,100-incidents.length*15);
-    const color=score>=80?'#34d399':score>=60?'var(--accent)':'#f87171';
-    return `<div class="safety-score-card">
-      <div class="ss-site">${s.name}</div>
-      <div style="display:flex;align-items:center;gap:1rem;">
-        <div class="ss-score" style="color:${color};">${score}</div>
-        <div style="flex:1;"><div class="pb ss-bar"><div class="pb-fill" style="width:${score}%;background:${color};"></div></div>
-        <div style="font-size:0.72rem;color:var(--text3);margin-top:0.25rem;">${incidents.length} incident${incidents.length!==1?'s':''} recorded</div></div>
-      </div>
-    </div>`;
-  }).join('')||'<div class="empty-state"><i class="fas fa-star"></i>No sites found</div>';
+function downloadJSON(data, filename) {
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 /* ============================================================
    30. AUDIT LOG
    ============================================================ */
-function renderAuditLog(){
-  renderAuditTable();
+function renderAuditLog() {
   renderAuditHeatmap();
-  $('auditExport')?.addEventListener('click',()=>exportCSV(DB.auditLog,'audit_log.csv'));
-  ['auditSearch','auditUser','auditAction','auditFrom','auditTo'].forEach(id=>$(id)?.addEventListener('input',renderAuditTable));
-  const userSel=$('auditUser');
-  if(userSel)userSel.innerHTML='<option value="">All Users</option>'+DB.users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
+  filterAndUpdateAuditLog(); // Changed from renderAuditTable()
+  $('auditExport')?.addEventListener('click', () => exportCSV(DB.auditLog, 'audit_log.csv'));
+  ['auditSearch', 'auditUser', 'auditAction', 'auditFrom', 'auditTo'].forEach(id => $(id)?.addEventListener('input', filterAndUpdateAuditLog));
+  const userSel = $('auditUser');
+  if (userSel) userSel.innerHTML = '<option value="">All Users</option>' + DB.users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
 }
 
-function renderAuditTable(){
-  const q=$('auditSearch')?.value.toLowerCase()||'';
-  const uid=+$('auditUser')?.value||0;
-  const action=$('auditAction')?.value||'';
-  const from=$('auditFrom')?.value||'';
-  const to=$('auditTo')?.value||'';
-  const rows=DB.auditLog.filter(l=>{
-    if(q&&!l.details.toLowerCase().includes(q)&&!l.target.toLowerCase().includes(q))return false;
-    if(uid&&l.userId!==uid)return false;
-    if(action&&l.action!==action)return false;
-    if(from&&l.time.slice(0,10)<from)return false;
-    if(to&&l.time.slice(0,10)>to)return false;
+// New function to filter and paginate audit log
+function filterAndUpdateAuditLog() {
+  const q = $('auditSearch')?.value.toLowerCase() || '';
+  const uid = +$('auditUser')?.value || 0;
+  const action = $('auditAction')?.value || '';
+  const from = $('auditFrom')?.value || '';
+  const to = $('auditTo')?.value || '';
+  
+  const filteredLogs = DB.auditLog.filter(l => {
+    if (q && !l.details.toLowerCase().includes(q) && !l.target.toLowerCase().includes(q)) return false;
+    if (uid && l.userId !== uid) return false;
+    if (action && l.action !== action) return false;
+    if (from && l.time.slice(0, 10) < from) return false;
+    if (to && l.time.slice(0, 10) > to) return false;
     return true;
   });
-  $('auditTbody').innerHTML=rows.map(l=>{const u=userById(l.userId);return`<tr>
-    <td style="font-size:0.75rem;white-space:nowrap;">${l.time}</td>
-    <td><div class="user-cell">${avatarEl(u,24)}<span style="font-size:0.8rem;">${u?.name||'System'}</span></div></td>
-    <td>${roleBadge(u?.role||'worker')}</td>
-    <td><span class="badge b-${l.action==='login'||l.action==='logout'?'update':l.action==='delete'?'inactive':l.action==='approve'?'active':'update'}">${l.action}</span></td>
-    <td style="font-size:0.8rem;">${l.target}</td>
-    <td style="font-size:0.78rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.details}</td>
-    <td><code style="font-size:0.7rem;">${l.ip}</code></td>
-    <td>${statusBadge(l.status==='success'?'active':'inactive')}</td>
-  </tr>`;}).join('')||'<tr><td colspan="8"><div class="empty-state"><i class="fas fa-scroll"></i>No log entries</div></td></tr>';
+  
+  // Sort by time (newest first)
+  filteredLogs.sort((a, b) => new Date(b.time) - new Date(a.time));
+  
+  // Create paginator for audit log table
+  if (filteredLogs.length >= 0) {
+    createPaginator('auditTbody', filteredLogs, (data) => {
+      renderAuditTableBody(data);
+    }, { perPage: 10 });
+  }
 }
 
-function renderAuditHeatmap(){
-  const el=$('auditHeatmap');if(!el)return;
-  const counts={};
-  DB.auditLog.forEach(l=>{const d=l.time.slice(0,10);counts[d]=(counts[d]||0)+1;});
-  const today=new Date();
-  let html='<div class="heatmap-grid">';
-  for(let i=51;i>=0;i--){
-    for(let j=0;j<7;j++){
-      const d=new Date(today);d.setDate(d.getDate()-(i*7+j));
-      const key=d.toISOString().slice(0,10);
-      const n=counts[key]||0;
-      const level=n===0?0:n<=1?1:n<=3?2:n<=5?3:4;
-      html+=`<div class="hm-cell hm-l${level}" title="${key}: ${n} actions"></div>`;
+// New function to render only the table body
+function renderAuditTableBody(logs) {
+  if (!logs.length) {
+    $('auditTbody').innerHTML = '<tr><td colspan="8"><div class="empty-state"><i class="fas fa-scroll"></i>No log entries found</div></td></tr>';
+    return;
+  }
+  
+  $('auditTbody').innerHTML = logs.map(l => {
+    const u = userById(l.userId);
+    let badgeClass = 'update';
+    if (l.action === 'login' || l.action === 'logout') badgeClass = 'update';
+    else if (l.action === 'delete') badgeClass = 'inactive';
+    else if (l.action === 'approve') badgeClass = 'active';
+    else badgeClass = 'update';
+    
+    return `
+      <tr>
+        <td style="font-size:0.75rem;white-space:nowrap;">${l.time}</td>
+        <td><div class="user-cell">${avatarEl(u, 24)}<span style="font-size:0.8rem;">${u?.name || 'System'}</span></div></td>
+        <td>${roleBadge(u?.role || 'worker')}</td>
+        <td><span class="badge b-${badgeClass}">${l.action}</span></td>
+        <td style="font-size:0.8rem;">${l.target}</td>
+        <td style="font-size:0.78rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.details}</td>
+        <td><code style="font-size:0.7rem;">${l.ip}</code></td>
+        <td>${statusBadge(l.status === 'success' ? 'active' : 'inactive')}</td>
+      </tr>`;
+  }).join('');
+}
+
+// Keep original function for compatibility (if called elsewhere)
+function renderAuditTable() {
+  filterAndUpdateAuditLog();
+}
+
+function renderAuditHeatmap() {
+  const el = $('auditHeatmap');
+  if (!el) return;
+  
+  const counts = {};
+  DB.auditLog.forEach(l => {
+    const d = l.time.slice(0, 10);
+    counts[d] = (counts[d] || 0) + 1;
+  });
+  
+  const today = new Date();
+  let html = '<div class="heatmap-grid">';
+  
+  for (let i = 51; i >= 0; i--) {
+    for (let j = 0; j < 7; j++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (i * 7 + j));
+      const key = d.toISOString().slice(0, 10);
+      const n = counts[key] || 0;
+      const level = n === 0 ? 0 : (n <= 1 ? 1 : (n <= 3 ? 2 : (n <= 5 ? 3 : 4)));
+      html += `<div class="hm-cell hm-l${level}" title="${key}: ${n} actions"></div>`;
     }
   }
-  html+='</div><div style="font-size:0.72rem;color:var(--text3);margin-top:0.5rem;">Last 52 weeks — each cell = 1 day</div>';
-  el.innerHTML=html;
+  
+  html += '</div><div style="font-size:0.72rem;color:var(--text3);margin-top:0.5rem;">Last 52 weeks — each cell = 1 day</div>';
+  el.innerHTML = html;
 }
 
 /* ============================================================
@@ -2488,268 +3610,669 @@ function renderOverridesTable(){
 /* ============================================================
    32. CLIENT PORTAL
    ============================================================ */
-function renderClientPortal(){
+function renderClientPortal() {
   wireCPTabs();
-  renderClientTable();
-  renderTicketTable();
+  filterAndUpdateClients(); // Changed from renderClientTable()
+  filterAndUpdateTickets();  // Changed from renderTicketTable()
   populateCPSelects();
-  $('addClientBtn')?.addEventListener('click',()=>openClientModal());
-  $('addTicketBtn')?.addEventListener('click',()=>openTicketModal());
-  $('cl_save')?.addEventListener('click',()=>saveClient(null));
-  $('tk_save')?.addEventListener('click',()=>saveTicket(null));
-  ['clientSearch'].forEach(id=>$(id)?.addEventListener('input',renderClientTable));
-  ['ticketStatus','ticketClient'].forEach(id=>$(id)?.addEventListener('change',renderTicketTable));
+  $('addClientBtn')?.addEventListener('click', () => openClientModal());
+  $('addTicketBtn')?.addEventListener('click', () => openTicketModal());
+  $('cl_save')?.addEventListener('click', () => saveClient(null));
+  $('tk_save')?.addEventListener('click', () => saveTicket(null));
+  ['clientSearch'].forEach(id => $(id)?.addEventListener('input', filterAndUpdateClients));
+  ['ticketStatus', 'ticketClient'].forEach(id => $(id)?.addEventListener('change', filterAndUpdateTickets));
 }
 
-function wireCPTabs(){
-  const panels={clients:'cp-clients',tickets:'cp-tickets'};
-  $$('[data-cptab]').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      $$('[data-cptab]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
-      Object.values(panels).forEach(id=>{const el=$(id);if(el)el.style.display='none';});
-      const target=$(panels[btn.dataset.cptab]);if(target)target.style.display='';
+function wireCPTabs() {
+  const panels = { clients: 'cp-clients', tickets: 'cp-tickets' };
+  $$('[data-cptab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('[data-cptab]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      Object.values(panels).forEach(id => {
+        const el = $(id);
+        if (el) el.style.display = 'none';
+      });
+      const target = $(panels[btn.dataset.cptab]);
+      if (target) target.style.display = '';
+      
+      // Refresh data when switching tabs
+      if (btn.dataset.cptab === 'clients') {
+        filterAndUpdateClients();
+      } else if (btn.dataset.cptab === 'tickets') {
+        filterAndUpdateTickets();
+      }
     });
   });
 }
 
-function populateCPSelects(){
-  const tkClient=$('tk_client');if(tkClient)tkClient.innerHTML=DB.clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  const tkAss=$('tk_assignee');if(tkAss)tkAss.innerHTML=DB.users.filter(u=>u.role!=='worker').map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
-  const ticketClient=$('ticketClient');if(ticketClient)ticketClient.innerHTML='<option value="">All Clients</option>'+DB.clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  const cl_sites=$('cl_sitesCheck');if(cl_sites)cl_sites.innerHTML=DB.sites.map(s=>`<label style="display:flex;align-items:center;gap:0.35rem;font-size:0.82rem;"><input type="checkbox" value="${s.id}"> ${s.name}</label>`).join('');
+function populateCPSelects() {
+  const tkClient = $('tk_client');
+  if (tkClient) tkClient.innerHTML = DB.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  const tkAss = $('tk_assignee');
+  if (tkAss) tkAss.innerHTML = DB.users.filter(u => u.role !== 'worker').map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+  const ticketClient = $('ticketClient');
+  if (ticketClient) ticketClient.innerHTML = '<option value="">All Clients</option>' + DB.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  const cl_sites = $('cl_sitesCheck');
+  if (cl_sites) cl_sites.innerHTML = DB.sites.map(s => `<label style="display:flex;align-items:center;gap:0.35rem;font-size:0.82rem;"><input type="checkbox" value="${s.id}"> ${s.name}</label>`).join('');
 }
 
-function renderClientTable(){
-  const q=$('clientSearch')?.value.toLowerCase()||'';
-  const rows=DB.clients.filter(c=>!q||c.name.toLowerCase().includes(q)||c.contact.toLowerCase().includes(q));
-  $('clientTbody').innerHTML=rows.map(c=>`<tr>
-    <td style="font-weight:600;">${c.name}</td>
-    <td>${c.contact}</td>
-    <td>${c.email}</td>
-    <td style="font-size:0.78rem;">${c.siteIds.map(id=>siteById(id)?.name).filter(Boolean).join(', ')||'None'}</td>
-    <td>${DB.tickets.filter(t=>t.clientId===c.id).length}</td>
-    <td>${statusBadge(c.status)}</td>
-    <td>
-      <button class="abt warn" onclick="openClientModal(${c.id})"><i class="fas fa-pen"></i></button>
-      <button class="abt dan" onclick="deleteClient(${c.id})"><i class="fas fa-trash"></i></button>
-    </td>
-  </tr>`).join('')||'<tr><td colspan="7"><div class="empty-state"><i class="fas fa-briefcase"></i>No clients</div></td></tr>';
+// ========== CLIENTS TABLE (with pagination) ==========
+function filterAndUpdateClients() {
+  const q = $('clientSearch')?.value.toLowerCase() || '';
+  
+  const filteredClients = DB.clients.filter(c => 
+    !q || c.name.toLowerCase().includes(q) || c.contact.toLowerCase().includes(q)
+  );
+  
+  createPaginator('clientTbody', filteredClients, (data) => {
+    renderClientTableBody(data);
+  }, { perPage: 10 });
 }
 
-function openClientModal(clientId=null){
+function renderClientTableBody(clients) {
+  if (!clients.length) {
+    $('clientTbody').innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="fas fa-briefcase"></i>No clients found</div></td></tr>';
+    return;
+  }
+  
+  $('clientTbody').innerHTML = clients.map(c => `
+    <tr>
+      <td style="font-weight:600;">${c.name}</td>
+      <td>${c.contact}</td>
+      <td>${c.email}</td>
+      <td style="font-size:0.78rem;">${(c.siteIds || []).map(id => siteById(id)?.name).filter(Boolean).join(', ') || 'None'}</td>
+      <td>${DB.tickets.filter(t => t.clientId === c.id).length}</td>
+      <td>${statusBadge(c.status)}</td>
+      <td>
+        <button class="abt warn" onclick="openClientModal(${c.id})"><i class="fas fa-pen"></i></button>
+        <button class="abt dan" onclick="deleteClient(${c.id})"><i class="fas fa-trash"></i></button>
+      </td>
+    </tr>`).join('');
+}
+
+// Keep original for compatibility
+function renderClientTable() {
+  filterAndUpdateClients();
+}
+
+function openClientModal(clientId = null) {
   populateCPSelects();
-  const c=clientId?DB.clients.find(x=>x.id===clientId):null;
-  $('clientTitle').textContent=c?'Edit Client':'Add Client';
-  $('cl_name').value=c?.name||'';
-  $('cl_contact').value=c?.contact||'';
-  $('cl_email').value=c?.email||'';
-  $('cl_phone').value=c?.phone||'';
-  if(c){$('cl_sitesCheck').querySelectorAll('input').forEach(cb=>{cb.checked=c.siteIds.includes(+cb.value);});}
-  $('cl_save').onclick=()=>saveClient(clientId);
+  const c = clientId ? DB.clients.find(x => x.id === clientId) : null;
+  $('clientTitle').textContent = c ? 'Edit Client' : 'Add Client';
+  $('cl_name').value = c?.name || '';
+  $('cl_contact').value = c?.contact || '';
+  $('cl_email').value = c?.email || '';
+  $('cl_phone').value = c?.phone || '';
+  if (c) {
+    $('cl_sitesCheck').querySelectorAll('input').forEach(cb => {
+      cb.checked = (c.siteIds || []).includes(+cb.value);
+    });
+  }
+  $('cl_save').onclick = () => saveClient(clientId);
   openM('clientModal');
 }
 
-function saveClient(clientId){
-  const data={name:$('cl_name').value.trim(),contact:$('cl_contact').value.trim(),email:$('cl_email').value.trim(),phone:$('cl_phone')?.value.trim(),siteIds:[...$('cl_sitesCheck').querySelectorAll('input:checked')].map(i=>+i.value),status:'active'};
-  if(!data.name){toast('Name required','error');return;}
-  if(clientId){Object.assign(DB.clients.find(c=>c.id===clientId),data);}
-  else{DB.clients.push({id:generateId('clients'),...data});}
-  closeM('clientModal');renderClientTable();toast('Client saved','success');
+function saveClient(clientId) {
+  const data = {
+    name: $('cl_name').value.trim(),
+    contact: $('cl_contact').value.trim(),
+    email: $('cl_email').value.trim(),
+    phone: $('cl_phone')?.value.trim(),
+    siteIds: [...$('cl_sitesCheck').querySelectorAll('input:checked')].map(i => +i.value),
+    status: 'active'
+  };
+  if (!data.name) {
+    toast('Name required', 'error');
+    return;
+  }
+  if (clientId) {
+    Object.assign(DB.clients.find(c => c.id === clientId), data);
+  } else {
+    DB.clients.push({ id: generateId('clients'), ...data });
+  }
+  closeM('clientModal');
+  filterAndUpdateClients();
+  toast('Client saved', 'success');
 }
 
-function deleteClient(id){if(!confirm('Delete client?'))return;DB.clients.splice(DB.clients.findIndex(c=>c.id===id),1);renderClientTable();toast('Client deleted','success');}
-
-function renderTicketTable(){
-  const st=$('ticketStatus')?.value||'';
-  const cid=+$('ticketClient')?.value||0;
-  const rows=DB.tickets.filter(t=>{if(st&&t.status!==st)return false;if(cid&&t.clientId!==cid)return false;return true;});
-  $('ticketTbody').innerHTML=rows.map(t=>{
-    const c=DB.clients.find(x=>x.id===t.clientId);
-    const a=userById(t.assigneeId);
-    return`<tr>
-      <td style="font-family:'Space Grotesk',sans-serif;font-weight:700;">#${String(t.id).padStart(4,'0')}</td>
-      <td>${c?.name||'—'}</td>
-      <td style="font-weight:500;">${t.subject}</td>
-      <td>${priorityBadge(t.priority)}</td>
-      <td><div class="user-cell">${avatarEl(a,24)}<span style="font-size:0.78rem;">${a?.name||'—'}</span></div></td>
-      <td style="font-size:0.75rem;">${fmt(t.created)}</td>
-      <td style="font-size:0.75rem;">${fmt(t.updated)}</td>
-      <td>${statusBadge(t.status==='open'?'active':t.status==='in-progress'?'in-progress':'completed')}</td>
-      <td>
-        <button class="abt warn" onclick="openTicketModal(${t.id})"><i class="fas fa-pen"></i></button>
-        <button class="abt dan" onclick="deleteTicket(${t.id})"><i class="fas fa-trash"></i></button>
-      </td>
-    </tr>`;
-  }).join('')||'<tr><td colspan="9"><div class="empty-state"><i class="fas fa-ticket"></i>No tickets</div></td></tr>';
+function deleteClient(id) {
+  if (!confirm('Delete client?')) return;
+  DB.clients.splice(DB.clients.findIndex(c => c.id === id), 1);
+  filterAndUpdateClients();
+  toast('Client deleted', 'success');
 }
 
-function openTicketModal(ticketId=null){
+// ========== TICKETS TABLE (with pagination) ==========
+function filterAndUpdateTickets() {
+  const st = $('ticketStatus')?.value || '';
+  const cid = +$('ticketClient')?.value || 0;
+  
+  const filteredTickets = DB.tickets.filter(t => {
+    if (st && t.status !== st) return false;
+    if (cid && t.clientId !== cid) return false;
+    return true;
+  });
+  
+  // Sort by created date (newest first)
+  filteredTickets.sort((a, b) => new Date(b.created) - new Date(a.created));
+  
+  createPaginator('ticketTbody', filteredTickets, (data) => {
+    renderTicketTableBody(data);
+  }, { perPage: 10 });
+}
+
+function renderTicketTableBody(tickets) {
+  if (!tickets.length) {
+    $('ticketTbody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-ticket"></i>No tickets found</div></td></tr>';
+    return;
+  }
+  
+  $('ticketTbody').innerHTML = tickets.map(t => {
+    const c = DB.clients.find(x => x.id === t.clientId);
+    const a = userById(t.assigneeId);
+    let statusClass = 'active';
+    if (t.status === 'open') statusClass = 'active';
+    else if (t.status === 'in-progress') statusClass = 'in-progress';
+    else if (t.status === 'closed') statusClass = 'completed';
+    
+    return `
+      <tr>
+        <td style="font-family:'Space Grotesk',sans-serif;font-weight:700;">#${String(t.id).padStart(4, '0')}</td>
+        <td>${c?.name || '—'}</td>
+        <td style="font-weight:500;">${t.subject}</td>
+        <td>${priorityBadge(t.priority)}</td>
+        <td><div class="user-cell">${avatarEl(a, 24)}<span style="font-size:0.78rem;">${a?.name || '—'}</span></div></td>
+        <td style="font-size:0.75rem;">${fmt(t.created)}</td>
+        <td style="font-size:0.75rem;">${fmt(t.updated)}</td>
+        <td>${statusBadge(statusClass)}</td>
+        <td>
+          <button class="abt warn" onclick="openTicketModal(${t.id})"><i class="fas fa-pen"></i></button>
+          <button class="abt dan" onclick="deleteTicket(${t.id})"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// Keep original for compatibility
+function renderTicketTable() {
+  filterAndUpdateTickets();
+}
+
+function openTicketModal(ticketId = null) {
   populateCPSelects();
-  const t=ticketId?DB.tickets.find(x=>x.id===ticketId):null;
-  $('ticketTitle').textContent=t?'Edit Ticket':'New Ticket';
-  $('tk_client').value=t?.clientId||DB.clients[0]?.id||'';
-  $('tk_priority').value=t?.priority||'medium';
-  $('tk_subject').value=t?.subject||'';
-  $('tk_desc').value=t?.desc||'';
-  $('tk_assignee').value=t?.assigneeId||'';
-  $('tk_save').onclick=()=>saveTicket(ticketId);
+  const t = ticketId ? DB.tickets.find(x => x.id === ticketId) : null;
+  $('ticketTitle').textContent = t ? 'Edit Ticket' : 'New Ticket';
+  $('tk_client').value = t?.clientId || DB.clients[0]?.id || '';
+  $('tk_priority').value = t?.priority || 'medium';
+  $('tk_subject').value = t?.subject || '';
+  $('tk_desc').value = t?.desc || '';
+  $('tk_assignee').value = t?.assigneeId || '';
+  $('tk_save').onclick = () => saveTicket(ticketId);
   openM('ticketModal');
 }
 
-function saveTicket(ticketId){
-  const data={clientId:+$('tk_client').value,priority:$('tk_priority').value,subject:$('tk_subject').value.trim(),desc:$('tk_desc').value.trim(),assigneeId:+$('tk_assignee').value,status:'open',created:nowStr().slice(0,10),updated:nowStr().slice(0,10)};
-  if(!data.subject){toast('Subject required','error');return;}
-  if(ticketId){Object.assign(DB.tickets.find(t=>t.id===ticketId),{...data,updated:nowStr().slice(0,10)});sendEmail(DB.clients.find(c=>c.id===data.clientId)?.email||'','Ticket Updated','ticket_update');}
-  else{DB.tickets.push({id:generateId('tickets'),...data});logAction('create',`Ticket #${nextId.tickets-1}`,`Created for client`);}
-  closeM('ticketModal');renderTicketTable();toast('Ticket saved','success');
+function saveTicket(ticketId) {
+  const data = {
+    clientId: +$('tk_client').value,
+    priority: $('tk_priority').value,
+    subject: $('tk_subject').value.trim(),
+    desc: $('tk_desc').value.trim(),
+    assigneeId: +$('tk_assignee').value,
+    status: 'open',
+    created: nowStr().slice(0, 10),
+    updated: nowStr().slice(0, 10)
+  };
+  if (!data.subject) {
+    toast('Subject required', 'error');
+    return;
+  }
+  if (ticketId) {
+    Object.assign(DB.tickets.find(t => t.id === ticketId), { ...data, updated: nowStr().slice(0, 10) });
+    sendEmail(DB.clients.find(c => c.id === data.clientId)?.email || '', 'Ticket Updated', 'ticket_update');
+  } else {
+    DB.tickets.push({ id: generateId('tickets'), ...data });
+    logAction('create', `Ticket #${nextId.tickets - 1}`, `Created for client`);
+  }
+  closeM('ticketModal');
+  filterAndUpdateTickets();
+  toast('Ticket saved', 'success');
 }
 
-function deleteTicket(id){if(!confirm('Delete ticket?'))return;DB.tickets.splice(DB.tickets.findIndex(t=>t.id===id),1);renderTicketTable();toast('Ticket deleted','success');}
-
+function deleteTicket(id) {
+  if (!confirm('Delete ticket?')) return;
+  DB.tickets.splice(DB.tickets.findIndex(t => t.id === id), 1);
+  filterAndUpdateTickets();
+  toast('Ticket deleted', 'success');
+}
 /* ============================================================
    33. REPORTS
    ============================================================ */
-function renderReports(){
-  $('rptGenerate')?.addEventListener('click',generateReport);
-  $('rptExport')?.addEventListener('click',()=>toast('Report exported to CSV','success'));
-  $('rptPrint')?.addEventListener('click',()=>window.print());
+function renderReports() {
+  $('rptGenerate')?.addEventListener('click', generateReport);
+  $('rptExport')?.addEventListener('click', () => {
+    const currentData = window.currentReportData;
+    if (currentData && currentData.length) {
+      exportCSV(currentData, 'report.csv');
+      toast('Report exported to CSV', 'success');
+    } else {
+      toast('No data to export', 'warn');
+    }
+  });
+  $('rptPrint')?.addEventListener('click', () => window.print());
 }
 
-function generateReport(){
-  const type=$('rptType')?.value;
-  const output=$('rptOutput');
-  const reports={
-    leave:()=>{
-      const data=DB.leaveRequests.map(l=>({User:userById(l.userId)?.name,Type:l.type,From:l.from,To:l.to,Days:l.days,Status:l.status}));
-      return tableFromData(data,'Leave Summary');
+function generateReport() {
+  const type = $('rptType')?.value;
+  const output = $('rptOutput');
+  
+  const reports = {
+    leave: () => {
+      const data = DB.leaveRequests.map(l => ({
+        User: userById(l.userId)?.name,
+        Type: l.type,
+        From: l.from,
+        To: l.to,
+        Days: l.days,
+        Status: l.status
+      }));
+      return { data, title: 'Leave Summary' };
     },
-    documents:()=>{
-      const data=DB.users.map(u=>({User:u.name,Docs:DB.documents.filter(d=>d.userId===u.id).length,Approved:DB.documents.filter(d=>d.userId===u.id&&d.status==='approved').length,Pending:DB.documents.filter(d=>d.userId===u.id&&d.status==='pending').length}));
-      return tableFromData(data,'Document Completion');
+    documents: () => {
+      const data = DB.users.map(u => ({
+        User: u.name,
+        Docs: DB.documents.filter(d => d.userId === u.id).length,
+        Approved: DB.documents.filter(d => d.userId === u.id && d.status === 'approved').length,
+        Pending: DB.documents.filter(d => d.userId === u.id && d.status === 'pending').length
+      }));
+      return { data, title: 'Document Completion' };
     },
-    activity:()=>{
-      const data=DB.auditLog.slice(0,20).map(l=>({Time:l.time,User:userById(l.userId)?.name,Action:l.action,Target:l.target}));
-      return tableFromData(data,'User Activity');
+    activity: () => {
+      const data = DB.auditLog.map(l => ({
+        Time: l.time,
+        User: userById(l.userId)?.name,
+        Action: l.action,
+        Target: l.target,
+        Details: l.details
+      }));
+      return { data, title: 'User Activity' };
     },
-    payroll:()=>{
-      const data=DB.payroll.map(p=>({Employee:userById(p.userId)?.name,Base:fmtMoney(p.baseSalary),Net:fmtMoney(netPay(p)),Status:p.status}));
-      return tableFromData(data,'Payroll Cost');
+    payroll: () => {
+      const data = DB.payroll.map(p => ({
+        Employee: userById(p.userId)?.name,
+        Base: fmtMoney(p.baseSalary),
+        Overtime: fmtMoney(p.overtime),
+        Bonus: fmtMoney(p.bonus),
+        Deductions: fmtMoney(p.deductions),
+        Net: fmtMoney(netPay(p)),
+        Status: p.status
+      }));
+      return { data, title: 'Payroll Summary' };
     },
-    tasks:()=>{
-      const data=DB.tasks.map(t=>({Task:t.title,Project:projectById(t.projectId)?.name,Assignee:userById(t.assigneeId)?.name,Status:t.status,Priority:t.priority}));
-      return tableFromData(data,'Task Completion');
+    tasks: () => {
+      const data = DB.tasks.map(t => ({
+        Task: t.title,
+        Project: projectById(t.projectId)?.name,
+        Assignee: userById(t.assigneeId)?.name,
+        Status: t.status,
+        Priority: t.priority,
+        DueDate: fmt(t.dueDate)
+      }));
+      return { data, title: 'Task Completion' };
     },
-    safety:()=>{
-      const data=DB.incidents.map(i=>({Date:i.date,Site:siteById(i.siteId)?.name,Severity:i.severity,Type:i.type,Status:i.status}));
-      return tableFromData(data,'Safety Incidents');
-    },
+    safety: () => {
+      const data = DB.incidents.map(i => ({
+        Date: i.date,
+        Site: siteById(i.siteId)?.name,
+        Severity: i.severity,
+        Type: i.type,
+        Status: i.status === 'open' ? 'Open' : 'Resolved',
+        Description: i.desc
+      }));
+      return { data, title: 'Safety Incidents' };
+    }
   };
-  output.innerHTML=reports[type]?.()||'<div class="empty-state">No data</div>';
+  
+  const report = reports[type]?.();
+  if (report && report.data.length) {
+    window.currentReportData = report.data;
+    displayReportWithPagination(report.data, report.title, output);
+  } else {
+    output.innerHTML = '<div class="empty-state"><i class="fas fa-chart-bar"></i>No data available for this report</div>';
+    window.currentReportData = [];
+  }
 }
 
-function tableFromData(data,title){
-  if(!data.length)return`<div class="empty-state">No data for this report</div>`;
-  const keys=Object.keys(data[0]);
-    return`<div style="font-family:'Space Grotesk',sans-serif;font-weight:700;margin-bottom:1rem;">${title}</div>
-  <div style="overflow-x:auto;"><table class="dt"><thead><tr>${keys.map(k=>`<th>${k}</th>`).join('')}</tr></thead><tbody>
-  ${data.map(row=>`<tr>${keys.map(k=>`<td>${row[k]}</td>`).join('')}</tr>`).join('')}
-  </tbody></table></div>`;
+function displayReportWithPagination(data, title, container) {
+  if (!data.length) {
+    container.innerHTML = '<div class="empty-state">No data for this report</div>';
+    return;
+  }
+  
+  const keys = Object.keys(data[0]);
+  
+  // Create table structure
+  const tableHtml = `
+    <div style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;margin-bottom:1rem;">${title}</div>
+    <div style="overflow-x:auto;">
+      <table class="dt" id="reportTable">
+        <thead>
+          <tr>${keys.map(k => `<th>${k}</th>`).join('')}</tr>
+        </thead>
+        <tbody id="reportTbody"></tbody>
+      </table>
+    </div>
+  `;
+  
+  container.innerHTML = tableHtml;
+  
+  // Create paginator for report table
+  createPaginator('reportTbody', data, (pageData) => {
+    renderReportBody(pageData, keys);
+  }, { perPage: 10 });
+}
+
+function renderReportBody(pageData, keys) {
+  const tbody = $('reportTbody');
+  if (!tbody) return;
+  
+  tbody.innerHTML = pageData.map(row => `
+    <tr>
+      ${keys.map(k => `<td>${row[k] || '—'}</td>`).join('')}
+    </tr>
+  `).join('');
+}
+
+// Keep original function for compatibility
+function tableFromData(data, title) {
+  if (!data.length) return '<div class="empty-state">No data for this report</div>';
+  
+  const keys = Object.keys(data[0]);
+  const container = document.createElement('div');
+  displayReportWithPagination(data, title, container);
+  return container.innerHTML;
 }
 
 /* ============================================================
    34. SETTINGS
    ============================================================ */
-function renderSettings(){
+function renderSettings() {
   wireSettingsTabs();
   loadSettingsValues();
   wireSettingsEvents();
 }
 
-function wireSettingsTabs(){
-  const panels={general:'set-general',security:'set-security',appearance:'set-appearance',emailjs:'set-emailjs',company:'set-company','leave-policy':'set-leave-policy',data:'set-data'};
-  $$('[data-settab]').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      $$('[data-settab]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
-      Object.values(panels).forEach(id=>{const el=$(id);if(el)el.style.display='none';});
-      const target=$(panels[btn.dataset.settab]);if(target)target.style.display='';
+function wireSettingsTabs() {
+  const panels = { general: 'set-general', security: 'set-security', appearance: 'set-appearance', emailjs: 'set-emailjs', company: 'set-company', 'leave-policy': 'set-leave-policy', data: 'set-data' };
+  $$('[data-settab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('[data-settab]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      Object.values(panels).forEach(id => {
+        const el = $(id);
+        if (el) el.style.display = 'none';
+      });
+      const target = $(panels[btn.dataset.settab]);
+      if (target) target.style.display = '';
     });
   });
 }
 
-function loadSettingsValues(){
-  const s=DB.settings;
-  const set=(id,val)=>{const el=$(id);if(!el)return;if(el.type==='checkbox')el.checked=val;else el.value=val;};
-  set('sysName',s.systemName);set('sysTz',s.timezone);set('sysDateFmt',s.dateFormat);
-  set('swEmail',s.emailNotif);set('swSms',s.smsAlerts);set('swPush',s.pushNotif);set('swMaintenance',s.maintenanceMode);
-  set('workStart',s.workStart);set('workEnd',s.workEnd);
-  set('sesTimeout',s.sessionTimeout);set('maxLogin',s.maxLoginAttempts);set('pwdLen',s.passwordMinLen);
-  set('sw2fa',s.twoFactor);set('swIp',s.ipWhitelist);set('swAudit',s.auditLogging);
-  set('swCompact',s.compactMode);set('swAnims',s.animations);
-  set('ejsService',s.ejsService);set('ejsPublicKey',s.ejsPublicKey);
-  set('ejsTplWelcome',s.ejsTplWelcome);set('ejsTplLeave',s.ejsTplLeave);set('ejsTplDoc',s.ejsTplDoc);
-  set('ejsTplTask',s.ejsTplTask);set('ejsTplPayslip',s.ejsTplPayslip);set('ejsTplIncident',s.ejsTplIncident);set('ejsTplTicket',s.ejsTplTicket);
-  set('coName',s.companyName);set('coAddr',s.companyAddress);set('coPhone',s.companyPhone);set('coEmail',s.companyEmail);set('coWeb',s.companyWeb);
-  set('lpAnnual',s.lpAnnual);set('lpSick',s.lpSick);set('lpEmergency',s.lpEmergency);set('lpMaxConsec',s.lpMaxConsec);set('lpNotice',s.lpNotice);
-  set('swCarry',s.carryForward);set('swApproval',s.requireApproval);
+function loadSettingsValues() {
+  const s = DB.settings;
+  const set = (id, val) => {
+    const el = $(id);
+    if (!el) return;
+    if (el.type === 'checkbox') el.checked = val;
+    else el.value = val;
+  };
+  
+  set('sysName', s.systemName);
+  set('sysTz', s.timezone);
+  set('sysDateFmt', s.dateFormat);
+  set('sysCurrency', s.currency || 'USD');
+  set('currencyPosition', s.currencyPosition || 'before');
+  set('swEmail', s.emailNotif);
+  set('swSms', s.smsAlerts);
+  set('swPush', s.pushNotif);
+  set('swMaintenance', s.maintenanceMode);
+  set('workStart', s.workStart);
+  set('workEnd', s.workEnd);
+  set('sesTimeout', s.sessionTimeout);
+  set('maxLogin', s.maxLoginAttempts);
+  set('pwdLen', s.passwordMinLen);
+  set('sw2fa', s.twoFactor);
+  set('swIp', s.ipWhitelist);
+  set('swAudit', s.auditLogging);
+  set('swCompact', s.compactMode);
+  set('swAnims', s.animations);
+  set('ejsService', s.ejsService);
+  set('ejsPublicKey', s.ejsPublicKey);
+  set('ejsTplWelcome', s.ejsTplWelcome);
+  set('ejsTplLeave', s.ejsTplLeave);
+  set('ejsTplDoc', s.ejsTplDoc);
+  set('ejsTplTask', s.ejsTplTask);
+  set('ejsTplPayslip', s.ejsTplPayslip);
+  set('ejsTplIncident', s.ejsTplIncident);
+  set('ejsTplTicket', s.ejsTplTicket);
+  set('coName', s.companyName);
+  set('coAddr', s.companyAddress);
+  set('coPhone', s.companyPhone);
+  set('coEmail', s.companyEmail);
+  set('coWeb', s.companyWeb);
+  set('lpAnnual', s.lpAnnual);
+  set('lpSick', s.lpSick);
+  set('lpEmergency', s.lpEmergency);
+  set('lpMaxConsec', s.lpMaxConsec);
+  set('lpNotice', s.lpNotice);
+  set('swCarry', s.carryForward);
+  set('swApproval', s.requireApproval);
+  
+  // Apply currency formatting to all money displays
+  applyCurrencyFormatting();
 }
 
-function wireSettingsEvents(){
-  $('saveSettingsBtn')?.addEventListener('click',saveSettings);
-  $('clearCacheBtn')?.addEventListener('click',()=>{if(confirm('Clear cache?'))toast('Cache cleared','success');});
-  $('wipeDataBtn')?.addEventListener('click',()=>{if(confirm('WARNING: This will delete ALL data. Are you sure?')){if(confirm('Are you REALLY sure?'))toast('Data wipe cancelled (demo only)','warn');}});
-  $('exportAllBtn')?.addEventListener('click',()=>exportCSV(DB.users,'all_users.csv'));
-  $('ejsTestBtn')?.addEventListener('click',()=>{sendEmail('test@nixers.pro','Test Email from Nixers Pro','welcome_approved');toast('Test email sent','success');});
-  $('logoDropZone')?.addEventListener('click',()=>$('logoInput')?.click());
-  $('logoInput')?.addEventListener('change',e=>{
-    const f=e.target.files[0];if(!f)return;
-    const r=new FileReader();r.onload=ev=>{$('logoPreview').src=ev.target.result;$('logoPreview').style.display='block';};r.readAsDataURL(f);
+function wireSettingsEvents() {
+  $('saveSettingsBtn')?.addEventListener('click', saveSettings);
+  $('clearCacheBtn')?.addEventListener('click', () => { if (confirm('Clear cache?')) toast('Cache cleared', 'success'); });
+  $('wipeDataBtn')?.addEventListener('click', () => { if (confirm('WARNING: This will delete ALL data. Are you sure?')) { if (confirm('Are you REALLY sure?')) toast('Data wipe cancelled (demo only)', 'warn'); } });
+  $('exportAllBtn')?.addEventListener('click', () => exportCSV(DB.users, 'all_users.csv'));
+  $('ejsTestBtn')?.addEventListener('click', () => { sendEmail('test@nixers.pro', 'Test Email from Nixers Pro', 'welcome_approved'); toast('Test email sent', 'success'); });
+  $('logoDropZone')?.addEventListener('click', () => $('logoInput')?.click());
+  $('logoInput')?.addEventListener('change', e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader(); r.onload = ev => { $('logoPreview').src = ev.target.result; $('logoPreview').style.display = 'block'; }; r.readAsDataURL(f);
   });
-  $$('#colorSwatches .color-sw').forEach(sw=>{
-    sw.addEventListener('click',()=>{
-      $$('#colorSwatches .color-sw').forEach(s=>s.classList.remove('sel'));
+  $$('#colorSwatches .color-sw').forEach(sw => {
+    sw.addEventListener('click', () => {
+      $$('#colorSwatches .color-sw').forEach(s => s.classList.remove('sel'));
       sw.classList.add('sel');
       setAccentColor(sw.dataset.color);
     });
   });
-  $('tplPreviewSelect')?.addEventListener('change',updateTplPreview);
+  $('tplPreviewSelect')?.addEventListener('change', updateTplPreview);
   updateTplPreview();
+  
+  // Live currency preview when selection changes
+  $('sysCurrency')?.addEventListener('change', () => {
+    const currency = $('sysCurrency').value;
+    const position = $('currencyPosition').value;
+    updateCurrencyPreview(currency, position);
+  });
+  $('currencyPosition')?.addEventListener('change', () => {
+    const currency = $('sysCurrency').value;
+    const position = $('currencyPosition').value;
+    updateCurrencyPreview(currency, position);
+  });
 }
 
-function saveSettings(){
-  const s=DB.settings;
-  const get=(id,def='')=>{const el=$(id);if(!el)return def;if(el.type==='checkbox')return el.checked;return el.value;};
-  s.systemName=get('sysName');s.timezone=get('sysTz');s.dateFormat=get('sysDateFmt');
-  s.emailNotif=get('swEmail');s.smsAlerts=get('swSms');s.pushNotif=get('swPush');s.maintenanceMode=get('swMaintenance');
-  s.workStart=get('workStart');s.workEnd=get('workEnd');
-  s.sessionTimeout=+get('sesTimeout');s.maxLoginAttempts=+get('maxLogin');s.passwordMinLen=+get('pwdLen');
-  s.twoFactor=get('sw2fa');s.ipWhitelist=get('swIp');s.auditLogging=get('swAudit');
-  s.compactMode=get('swCompact');s.animations=get('swAnims');
-  s.ejsService=get('ejsService');s.ejsPublicKey=get('ejsPublicKey');
-  s.ejsTplWelcome=get('ejsTplWelcome');s.ejsTplLeave=get('ejsTplLeave');s.ejsTplDoc=get('ejsTplDoc');
-  s.ejsTplTask=get('ejsTplTask');s.ejsTplPayslip=get('ejsTplPayslip');s.ejsTplIncident=get('ejsTplIncident');s.ejsTplTicket=get('ejsTplTicket');
-  s.companyName=get('coName');s.companyAddress=get('coAddr');s.companyPhone=get('coPhone');s.companyEmail=get('coEmail');s.companyWeb=get('coWeb');
-  s.lpAnnual=+get('lpAnnual');s.lpSick=+get('lpSick');s.lpEmergency=+get('lpEmergency');s.lpMaxConsec=+get('lpMaxConsec');s.lpNotice=+get('lpNotice');
-  s.carryForward=get('swCarry');s.requireApproval=get('swApproval');
-  document.body.classList.toggle('compact',s.compactMode);
-  logAction('update','Settings','System settings updated');
-  toast('Settings saved','success');
-}
-
-function setAccentColor(color){
-  document.documentElement.style.setProperty('--accent',color);
-  DB.settings.accentColor=color;
-  toast('Accent color updated','success');
-}
-
-function updateTplPreview(){
-  const type=$('tplPreviewSelect')?.value||'welcome';
-  const previews={
-    welcome:`<div style="padding:0.5rem;"><strong style="color:var(--accent);">Subject:</strong> Welcome to Nixers Pro<br><br>Dear <strong>{name}</strong>,<br><br>Your account has been approved. You can now log in to Nixers Pro.<br><br>Best regards,<br>Nixers Admin Team</div>`,
-    leave:`<div style="padding:0.5rem;"><strong style="color:var(--accent);">Subject:</strong> Leave Request Update<br><br>Dear <strong>{name}</strong>,<br><br>Your leave request for <strong>{type}</strong> leave from {from} to {to} has been <strong>{status}</strong>.<br><br>{comment}<br><br>Regards,<br>HR Team</div>`,
-    task:`<div style="padding:0.5rem;"><strong style="color:var(--accent);">Subject:</strong> New Task Assigned<br><br>Hi <strong>{name}</strong>,<br><br>You have been assigned a new task: <strong>{task_title}</strong><br>Project: {project}<br>Due: {due_date}<br><br>Please log in to view details.<br><br>Thanks,<br>Nixers Team</div>`,
-    payslip:`<div style="padding:0.5rem;"><strong style="color:var(--accent);">Subject:</strong> Your Payslip is Ready<br><br>Dear <strong>{name}</strong>,<br><br>Your payslip for <strong>{period}</strong> is ready.<br>Net Pay: <strong>{net_pay}</strong><br><br>Please log in to download.<br><br>Payroll Team</div>`,
+function saveSettings() {
+  const s = DB.settings;
+  const get = (id, def = '') => {
+    const el = $(id);
+    if (!el) return def;
+    if (el.type === 'checkbox') return el.checked;
+    return el.value;
   };
-  if($('tplPreviewBox'))$('tplPreviewBox').innerHTML=previews[type]||'Select a template';
+  
+  s.systemName = get('sysName');
+  s.timezone = get('sysTz');
+  s.dateFormat = get('sysDateFmt');
+  s.currency = get('sysCurrency');
+  s.currencyPosition = get('currencyPosition');
+  s.emailNotif = get('swEmail');
+  s.smsAlerts = get('swSms');
+  s.pushNotif = get('swPush');
+  s.maintenanceMode = get('swMaintenance');
+  s.workStart = get('workStart');
+  s.workEnd = get('workEnd');
+  s.sessionTimeout = +get('sesTimeout');
+  s.maxLoginAttempts = +get('maxLogin');
+  s.passwordMinLen = +get('pwdLen');
+  s.twoFactor = get('sw2fa');
+  s.ipWhitelist = get('swIp');
+  s.auditLogging = get('swAudit');
+  s.compactMode = get('swCompact');
+  s.animations = get('swAnims');
+  s.ejsService = get('ejsService');
+  s.ejsPublicKey = get('ejsPublicKey');
+  s.ejsTplWelcome = get('ejsTplWelcome');
+  s.ejsTplLeave = get('ejsTplLeave');
+  s.ejsTplDoc = get('ejsTplDoc');
+  s.ejsTplTask = get('ejsTplTask');
+  s.ejsTplPayslip = get('ejsTplPayslip');
+  s.ejsTplIncident = get('ejsTplIncident');
+  s.ejsTplTicket = get('ejsTplTicket');
+  s.companyName = get('coName');
+  s.companyAddress = get('coAddr');
+  s.companyPhone = get('coPhone');
+  s.companyEmail = get('coEmail');
+  s.companyWeb = get('coWeb');
+  s.lpAnnual = +get('lpAnnual');
+  s.lpSick = +get('lpSick');
+  s.lpEmergency = +get('lpEmergency');
+  s.lpMaxConsec = +get('lpMaxConsec');
+  s.lpNotice = +get('lpNotice');
+  s.carryForward = get('swCarry');
+  s.requireApproval = get('swApproval');
+  
+  document.body.classList.toggle('compact', s.compactMode);
+  
+  // Apply currency formatting
+  applyCurrencyFormatting();
+  
+  logAction('update', 'Settings', 'System settings updated');
+  toast('Settings saved', 'success');
+}
+
+// Function to update currency preview
+function updateCurrencyPreview(currency, position) {
+  const symbols = {
+    USD: '$', EUR: '€', GBP: '£', BDT: '৳', AED: 'د.إ', SAR: 'ر.س',
+    INR: '₹', CAD: 'C$', AUD: 'A$', JPY: '¥', CNY: '¥', SGD: 'S$', MYR: 'RM'
+  };
+  const symbol = symbols[currency] || '$';
+  const amount = 1234.56;
+  let formatted = '';
+  
+  switch (position) {
+    case 'before':
+      formatted = `${symbol}${amount.toLocaleString()}`;
+      break;
+    case 'after':
+      formatted = `${amount.toLocaleString()}${symbol}`;
+      break;
+    case 'space_before':
+      formatted = `${symbol} ${amount.toLocaleString()}`;
+      break;
+    case 'space_after':
+      formatted = `${amount.toLocaleString()} ${symbol}`;
+      break;
+    default:
+      formatted = `${symbol}${amount.toLocaleString()}`;
+  }
+  
+  // Show preview if preview element exists
+  const previewEl = $('currencyPreview');
+  if (previewEl) {
+    previewEl.innerHTML = `<span style="color:var(--accent);">Preview: ${formatted}</span>`;
+  } else {
+    // Create preview element if it doesn't exist
+    const currencyRow = document.querySelector('#sysCurrency')?.closest('.fg');
+    if (currencyRow && !$('currencyPreview')) {
+      const previewDiv = document.createElement('div');
+      previewDiv.id = 'currencyPreview';
+      previewDiv.className = 'fg';
+      previewDiv.style.marginTop = '0.5rem';
+      previewDiv.innerHTML = `<span style="color:var(--accent);font-size:0.8rem;">Preview: ${formatted}</span>`;
+      currencyRow.after(previewDiv);
+    } else if ($('currencyPreview')) {
+      $('currencyPreview').innerHTML = `<span style="color:var(--accent);font-size:0.8rem;">Preview: ${formatted}</span>`;
+    }
+  }
+}
+
+// Function to apply currency formatting to all money displays
+function applyCurrencyFormatting() {
+  const currency = DB.settings.currency || 'USD';
+  const position = DB.settings.currencyPosition || 'before';
+  const symbols = {
+    USD: '$', EUR: '€', GBP: '£', BDT: '৳', AED: 'د.إ', SAR: 'ر.س',
+    INR: '₹', CAD: 'C$', AUD: 'A$', JPY: '¥', CNY: '¥', SGD: 'S$', MYR: 'RM'
+  };
+  const symbol = symbols[currency] || '$';
+  
+  // Store current settings globally for use in fmtMoney function
+  window.currencySymbol = symbol;
+  window.currencyPosition = position;
+  
+  // Update all money displays on the page
+  document.querySelectorAll('[data-money]').forEach(el => {
+    const amount = parseFloat(el.dataset.money);
+    if (!isNaN(amount)) {
+      el.textContent = formatMoneyWithSettings(amount);
+    }
+  });
+}
+
+// Enhanced fmtMoney function that uses currency settings
+function fmtMoneyWithSettings(amount) {
+  if (amount === undefined || amount === null) return '—';
+  const num = Number(amount);
+  if (isNaN(num)) return '—';
+  
+  const symbol = window.currencySymbol || '$';
+  const position = window.currencyPosition || 'before';
+  const formattedAmount = num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  
+  switch (position) {
+    case 'before': return `${symbol}${formattedAmount}`;
+    case 'after': return `${formattedAmount}${symbol}`;
+    case 'space_before': return `${symbol} ${formattedAmount}`;
+    case 'space_after': return `${formattedAmount} ${symbol}`;
+    default: return `${symbol}${formattedAmount}`;
+  }
+}
+
+// Override the global fmtMoney function
+const originalFmtMoney = fmtMoney;
+window.fmtMoney = fmtMoneyWithSettings;
+
+function setAccentColor(color) {
+  document.documentElement.style.setProperty('--accent', color);
+  DB.settings.accentColor = color;
+  toast('Accent color updated', 'success');
+}
+
+function updateTplPreview() {
+  const type = $('tplPreviewSelect')?.value || 'welcome';
+  const previews = {
+    welcome: `<div style="padding:0.5rem;"><strong style="color:var(--accent);">Subject:</strong> Welcome to Nixers Pro<br><br>Dear <strong>{name}</strong>,<br><br>Your account has been approved. You can now log in to Nixers Pro.<br><br>Best regards,<br>Nixers Admin Team</div>`,
+    leave: `<div style="padding:0.5rem;"><strong style="color:var(--accent);">Subject:</strong> Leave Request Update<br><br>Dear <strong>{name}</strong>,<br><br>Your leave request for <strong>{type}</strong> leave from {from} to {to} has been <strong>{status}</strong>.<br><br>{comment}<br><br>Regards,<br>HR Team</div>`,
+    task: `<div style="padding:0.5rem;"><strong style="color:var(--accent);">Subject:</strong> New Task Assigned<br><br>Hi <strong>{name}</strong>,<br><br>You have been assigned a new task: <strong>{task_title}</strong><br>Project: {project}<br>Due: {due_date}<br><br>Please log in to view details.<br><br>Thanks,<br>Nixers Team</div>`,
+    payslip: `<div style="padding:0.5rem;"><strong style="color:var(--accent);">Subject:</strong> Your Payslip is Ready<br><br>Dear <strong>{name}</strong>,<br><br>Your payslip for <strong>{period}</strong> is ready.<br>Net Pay: <strong>{net_pay}</strong><br><br>Please log in to download.<br><br>Payroll Team</div>`,
+  };
+  if ($('tplPreviewBox')) $('tplPreviewBox').innerHTML = previews[type] || 'Select a template';
 }
 
 /* ============================================================
