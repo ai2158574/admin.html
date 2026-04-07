@@ -27,6 +27,10 @@ let chartInstances = {};
 let selectedUserIds = new Set();
 let postAssignees = [];
 let postVoiceRecording = false;
+let projectTeamMembers = [];
+let taskAssignees = [];
+let taskVoiceRecording = false;
+let taskAttachments = [];
 let leaveCalDate = new Date();
 let shiftWeekOffset = 0;
 let currentPayrollPeriod = '2025-06';
@@ -41,7 +45,11 @@ function userById(id)     { return DB.users.find(u => u.id === id); }
 function siteById(id)     { return DB.sites.find(s => s.id === id); }
 function catById(id)      { return DB.categories.find(c => c.id === id); }
 function projectById(id)  { return DB.projects.find(p => p.id === id); }
-
+function taskAssigneeIds(task) {
+  if (!task) return [];
+  if (Array.isArray(task.assigneeIds) && task.assigneeIds.length) return task.assigneeIds.map(Number).filter(Boolean);
+  return task.assigneeId ? [Number(task.assigneeId)] : [];
+}
 function fmt(date) {
   if (!date) return '—';
   const d = new Date(date);
@@ -873,6 +881,7 @@ function openSiteModal(siteId=null) {
   $('sm_name').value   = s?.name   || '';
   $('sm_mgr').value    = s?.managerId || managers[0]?.id || '';
   $('sm_budget').value = s?.budget  || '';
+    $('sm_spent').value  = s?.spent   || '';
   $('sm_status').value = s?.status  || 'planning';
   $('sm_start').value  = s?.startDate|| '';
   $('sm_end').value    = s?.endDate  || '';
@@ -886,9 +895,9 @@ function saveSite(siteId) {
   const data = {
     name:$('sm_name').value.trim(), managerId:+$('sm_mgr').value,
     budget:+$('sm_budget').value||0, status:$('sm_status').value,
+      spent:+$('sm_spent').value||0,
     startDate:$('sm_start').value, endDate:$('sm_end').value,
-    progress:+$('sm_prog').value||0, desc:$('sm_desc').value.trim(), spent:0, workerIds:[],
-  };
+    progress:+$('sm_prog').value||0, desc:$('sm_desc').value.trim(), workerIds:[],
   if (!data.name) { toast('Site name required','error'); return; }
   if (siteId) { Object.assign(siteById(siteId), data); logAction('update',`Site #${siteId}`,`Updated ${data.name}`); }
   else { DB.sites.push({id:generateId('sites'),...data}); logAction('create','Site',`Created ${data.name}`); }
@@ -1266,7 +1275,7 @@ function renderAnalytics() {
     });
     /* Top performers */
     const perfs = DB.users.map(u=>({user:u, done:DB.tasks.filter(t=>t.assigneeId===u.id&&t.status==='done').length})).sort((a,b)=>b.done-a.done).slice(0,5);
-    $('topPerf').innerHTML = perfs.map((p,i)=>`<div class="perf-row"><span class="perf-rank">${i+1}</span>${avatarEl(p.user,30)}<div style="flex:1;"><div style="font-size:0.83rem;font-weight:600;">${p.user.name}</div><div style="font-size:0.72rem;color:var(--text3);">${p.user.role}</div></div><span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--accent);">${p.done} tasks</span></div>`).join('');
+        $('topPerf').innerHTML = perfs.map((p,i)=>`<div class="perf-row"><span class="perf-rank">${i+1}</span>${avatarEl(p.user,30)}<div style="flex:1;"><div style="font-size:0.83rem;font-weight:600;">${p.user.name}</div><div style="font-size:0.72rem;color:var(--text3);">${p.user.role}</div></div><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--accent);">${p.done} tasks</span></div>`).join('');
     /* Site progress */
     makeChart('anSites',{
       type:'bar',
@@ -1548,7 +1557,7 @@ function openPayslip(prId) {
   const u=userById(p.userId);
   $('payslipBody').innerHTML=`<div class="payslip-wrap">
     <div class="payslip-hdr">
-      <div><div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;">NIXERS.pro</div><div style="font-size:0.75rem;color:var(--text3);">Payslip — ${p.period}</div></div>
+      <div><div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.1rem;">NIXERS.pro</div><div style="font-size:0.75rem;color:var(--text3);">Payslip — ${p.period}</div></div>
       <div style="text-align:right;">${avatarEl(u,40)}</div>
     </div>
     <div style="margin-bottom:1rem;">${avatarEl(u,36)} <strong>${u?.name}</strong> · ${u?.dept||u?.role}</div>
@@ -1581,18 +1590,83 @@ function renderTasks() {
   renderProjectTable();
   renderKanban();
   renderGantt();
-  $('addProjectBtn')?.addEventListener('click',()=>openProjectModal());
-  $$('.kanban-add-btn').forEach(btn=>btn.addEventListener('click',()=>openTaskModal(null,btn.dataset.col)));
+   if ($('addProjectBtn')) $('addProjectBtn').onclick = () => openProjectModal();
+  if ($('projSearch')) $('projSearch').oninput = renderProjectTable;
+  if ($('projStatus')) $('projStatus').onchange = renderProjectTable;
+  ['kanbanProject','kanbanAssignee','kanbanPriority'].forEach(id => { if ($(id)) $(id).onchange = renderKanban; });
+  $$('.kanban-add-btn').forEach(btn => { btn.onclick = () => openTaskModal(null, btn.dataset.col); });
 }
 
 function populateProjectSelects() {
   const kp=$('kanbanProject'); if(kp) kp.innerHTML='<option value="">All Projects</option>'+DB.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
   const ka=$('kanbanAssignee'); if(ka) ka.innerHTML='<option value="">All Assignees</option>'+DB.users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
   const tmProj=$('tm_project'); if(tmProj) tmProj.innerHTML=DB.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  const tmAss=$('tm_assignee'); if(tmAss) tmAss.innerHTML=DB.users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
+  
   const projSite=$('proj_site'); if(projSite) projSite.innerHTML='<option value="">None</option>'+DB.sites.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
 }
+function renderAssignTags(ids, targetId, removeFn) {
+  const target = $(targetId);
+  if (!target) return;
+  target.innerHTML = ids.map(id => {
+    const u = userById(id);
+    return `<div class="assign-tag">${u?.name || id}<button onclick="${removeFn}(${id})">×</button></div>`;
+  }).join('');
+}
 
+function searchProjectTeam(q='') {
+  const res = $('proj_teamResults');
+  if (!res) return;
+  const query = q.trim().toLowerCase();
+  const options = DB.users.filter(u => !projectTeamMembers.includes(u.id) && (!query || u.name.toLowerCase().includes(query)));
+  res.innerHTML = options.map(u=>`<div class="assign-opt" onclick="addProjectTeamMember(${u.id})">${avatarEl(u,24)}<span>${u.name}</span></div>`).join('') || '<div style="padding:0.5rem;color:var(--text3);font-size:0.8rem;">No results</div>';
+  res.classList.add('show');
+}
+function addProjectTeamMember(id) {
+  if (!projectTeamMembers.includes(id)) projectTeamMembers.push(id);
+  renderAssignTags(projectTeamMembers, 'proj_teamTags', 'removeProjectTeamMember');
+  $('proj_teamResults')?.classList.remove('show');
+  if ($('proj_teamSearch')) $('proj_teamSearch').value = '';
+}
+function removeProjectTeamMember(id) {
+  projectTeamMembers = projectTeamMembers.filter(x => x !== id);
+  renderAssignTags(projectTeamMembers, 'proj_teamTags', 'removeProjectTeamMember');
+}
+
+function searchTaskAssignees(q='') {
+  const res = $('tm_assigneeResults');
+  if (!res) return;
+  const query = q.trim().toLowerCase();
+  const options = DB.users.filter(u => !taskAssignees.includes(u.id) && (!query || u.name.toLowerCase().includes(query)));
+  res.innerHTML = options.map(u=>`<div class="assign-opt" onclick="addTaskAssignee(${u.id})">${avatarEl(u,24)}<span>${u.name}</span></div>`).join('') || '<div style="padding:0.5rem;color:var(--text3);font-size:0.8rem;">No results</div>';
+  res.classList.add('show');
+}
+function addTaskAssignee(id) {
+  if (!taskAssignees.includes(id)) taskAssignees.push(id);
+  renderAssignTags(taskAssignees, 'tm_assigneeTags', 'removeTaskAssignee');
+  $('tm_assigneeResults')?.classList.remove('show');
+  if ($('tm_assigneeSearch')) $('tm_assigneeSearch').value = '';
+}
+function removeTaskAssignee(id) {
+  taskAssignees = taskAssignees.filter(x => x !== id);
+  renderAssignTags(taskAssignees, 'tm_assigneeTags', 'removeTaskAssignee');
+}
+function renderTaskAttachments() {
+  const box = $('tm_attFiles');
+  if (!box) return;
+  box.innerHTML = taskAttachments.map((f, i) => `<div class="af-item"><i class="fas fa-file"></i><span>${f.name}</span><button class="abt dan" onclick="removeTaskAttachment(${i})"><i class="fas fa-times"></i></button></div>`).join('') || '<div style="font-size:0.78rem;color:var(--text3);">No attachments added</div>';
+}
+function removeTaskAttachment(index) {
+  taskAttachments.splice(index, 1);
+  renderTaskAttachments();
+}
+function toggleTaskVoice() {
+  taskVoiceRecording = !taskVoiceRecording;
+  const btn = $('tm_voiceBtn');
+  if (btn) btn.classList.toggle('recording', taskVoiceRecording);
+  if (btn) btn.innerHTML = taskVoiceRecording ? '<i class="fas fa-stop"></i> Stop Recording' : '<i class="fas fa-microphone"></i> Record Voice';
+  if ($('tm_voiceStatus')) $('tm_voiceStatus').style.display = taskVoiceRecording ? '' : 'none';
+  toast(taskVoiceRecording ? 'Voice recording started (demo)' : 'Voice recording stopped', 'info');
+}
 function wireTTabs() {
   const panels={'projects':'tt-projects','kanban':'tt-kanban','gantt':'tt-gantt'};
   $$('[data-ttab]').forEach(btn=>{
@@ -1639,13 +1713,21 @@ function openProjectModal(projId=null) {
   $('proj_status').value=p?.status||'planning';
   $('proj_priority').value=p?.priority||'medium';
   $('proj_due').value=p?.dueDate||'';
+    $('proj_site').value=p?.siteId||'';
   $('proj_desc').value=p?.desc||'';
+   projectTeamMembers = [...(p?.teamIds||[])];
+  renderAssignTags(projectTeamMembers, 'proj_teamTags', 'removeProjectTeamMember');
+  if ($('proj_teamSearch')) {
+    $('proj_teamSearch').oninput = e => searchProjectTeam(e.target.value);
+    $('proj_teamSearch').onfocus = e => searchProjectTeam(e.target.value);
+  }
   $('proj_save').onclick=()=>saveProject(projId);
   openM('projectModal');
 }
 
 function saveProject(projId) {
-  const data={name:$('proj_name').value.trim(),status:$('proj_status').value,priority:$('proj_priority').value,dueDate:$('proj_due').value,desc:$('proj_desc').value.trim(),siteId:+$('proj_site')?.value||null,teamIds:[],progress:0};
+   const current = projId ? projectById(projId) : null;
+  const data={name:$('proj_name').value.trim(),status:$('proj_status').value,priority:$('proj_priority').value,dueDate:$('proj_due').value,desc:$('proj_desc').value.trim(),siteId:+$('proj_site')?.value||null,teamIds:[...projectTeamMembers],progress:current?.progress||0};
   if(!data.name){toast('Name required','error');return;}
   if(projId){Object.assign(projectById(projId),data);logAction('update',`Project #${projId}`,`Updated ${data.name}`);}
   else{DB.projects.push({id:generateId('projects'),...data});logAction('create','Project',`Created ${data.name}`);}
@@ -1661,12 +1743,21 @@ function deleteProject(id){
 
 function renderKanban() {
   const cols=['todo','inprogress','review','done'];
+    const projectFilter = +($('kanbanProject')?.value || 0);
+  const assigneeFilter = +($('kanbanAssignee')?.value || 0);
+  const priorityFilter = $('kanbanPriority')?.value || '';
   cols.forEach(col=>{
     const cards=$(`kCards-${col}`); if(!cards) return;
-    const tasks=DB.tasks.filter(t=>t.status===col);
+       const tasks=DB.tasks.filter(t=>{
+      if (t.status !== col) return false;
+      if (projectFilter && t.projectId !== projectFilter) return false;
+      if (priorityFilter && t.priority !== priorityFilter) return false;
+      if (assigneeFilter && !taskAssigneeIds(t).includes(assigneeFilter)) return false;
+      return true;
+    });
     $(`kc-${col}`).textContent=tasks.length;
     cards.innerHTML=tasks.map(t=>{
-      const u=userById(t.assigneeId);
+      const assignees = taskAssigneeIds(t).map(userById).filter(Boolean);
       const proj=projectById(t.projectId);
       return `<div class="kanban-card" onclick="openTaskModal(${t.id})">
         <div class="kc-title">${t.title}</div>
@@ -1674,7 +1765,7 @@ function renderKanban() {
         <div class="kc-meta">
           ${priorityBadge(t.priority)}
           ${t.dueDate?`<span style="font-size:0.68rem;color:var(--text3);">📅 ${fmt(t.dueDate)}</span>`:''}
-          <div class="kc-assignee">${avatarEl(u,20)} ${u?.name?.split(' ')[0]||'—'}</div>
+          <div class="kc-assignee">${assignees.slice(0,2).map(u=>avatarEl(u,20)).join('')}${assignees.length>2?`<span>+${assignees.length-2}</span>`:''}</div>
         </div>
       </div>`;
     }).join('')||'<div style="text-align:center;padding:1rem;color:var(--text3);font-size:0.75rem;">Drop tasks here</div>';
@@ -1688,23 +1779,41 @@ function openTaskModal(taskId=null, col='todo') {
   $('tm_title').value=t?.title||'';
   $('tm_project').value=t?.projectId||DB.projects[0]?.id||'';
   $('tm_priority').value=t?.priority||'medium';
-  $('tm_assignee').value=t?.assigneeId||DB.users[0]?.id||'';
+
   $('tm_due').value=t?.dueDate||'';
   $('tm_desc').value=t?.desc||'';
   $('tm_status').value=t?.status||col;
+    taskAssignees = [...taskAssigneeIds(t)];
+  taskAttachments = [...(t?.attachments || [])];
+  taskVoiceRecording = false;
+  renderAssignTags(taskAssignees, 'tm_assigneeTags', 'removeTaskAssignee');
+  renderTaskAttachments();
+  if ($('tm_assigneeSearch')) {
+    $('tm_assigneeSearch').oninput = e => searchTaskAssignees(e.target.value);
+    $('tm_assigneeSearch').onfocus = e => searchTaskAssignees(e.target.value);
+  }
+  if ($('tm_voiceBtn')) $('tm_voiceBtn').onclick = toggleTaskVoice;
+  if ($('tm_attachBtn')) $('tm_attachBtn').onclick = () => $('tm_files')?.click();
+  if ($('tm_files')) $('tm_files').onchange = e => {
+    const files = [...(e.target.files || [])].map(f => ({name:f.name, size:f.size, type:f.type}));
+    if (files.length) taskAttachments.push(...files);
+    renderTaskAttachments();
+    e.target.value = '';
+  };
   $('tm_save').onclick=()=>saveTask(taskId);
   openM('taskModal');
 }
 
 function saveTask(taskId) {
-  const assigneeId=+$('tm_assignee').value;
-  const data={title:$('tm_title').value.trim(),projectId:+$('tm_project').value,priority:$('tm_priority').value,assigneeId,dueDate:$('tm_due').value,desc:$('tm_desc').value.trim(),status:$('tm_status').value};
+  const assigneeIds = taskAssignees.length ? [...taskAssignees] : [DB.users[0]?.id].filter(Boolean);
+  const data={title:$('tm_title').value.trim(),projectId:+$('tm_project').value,priority:$('tm_priority').value,assigneeId:assigneeIds[0]||null,assigneeIds,dueDate:$('tm_due').value,desc:$('tm_desc').value.trim(),status:$('tm_status').value,attachments:[...taskAttachments]};
   if(!data.title){toast('Title required','error');return;}
   if(taskId){Object.assign(DB.tasks.find(t=>t.id===taskId),data);logAction('update',`Task #${taskId}`,`Updated ${data.title}`);}
   else{
     DB.tasks.push({id:generateId('tasks'),...data});
-    logAction('create','Task',`Created "${data.title}" assigned to ${userById(assigneeId)?.name}`);
-    sendEmail(userById(assigneeId)?.email||'','New Task Assigned','task_assigned');
+       const assignedNames = assigneeIds.map(id=>userById(id)?.name).filter(Boolean).join(', ');
+    logAction('create','Task',`Created "${data.title}" assigned to ${assignedNames || 'team'}`);
+    assigneeIds.forEach(id => sendEmail(userById(id)?.email||'','New Task Assigned','task_assigned'));
   }
   closeM('taskModal');renderKanban();renderProjectTable();toast('Task saved','success');
 }
@@ -1869,7 +1978,7 @@ function showQR(serial,name){
   $('qrBody').innerHTML=`
     <div style="font-weight:700;margin-bottom:1rem;">${name}</div>
     <div style="font-size:4rem;margin:1rem 0;">📦</div>
-    <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem;letter-spacing:3px;">${serial}</div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.1rem;letter-spacing:3px;">${serial}</div>
     <div style="font-size:0.75rem;color:var(--text3);margin-top:0.5rem;">(QR code would render here in production)</div>`;
   openM('qrModal');
 }
@@ -2458,7 +2567,7 @@ function renderTicketTable(){
     const c=DB.clients.find(x=>x.id===t.clientId);
     const a=userById(t.assigneeId);
     return`<tr>
-      <td style="font-family:'Syne',sans-serif;font-weight:700;">#${String(t.id).padStart(4,'0')}</td>
+      <td style="font-family:'Space Grotesk',sans-serif;font-weight:700;">#${String(t.id).padStart(4,'0')}</td>
       <td>${c?.name||'—'}</td>
       <td style="font-weight:500;">${t.subject}</td>
       <td>${priorityBadge(t.priority)}</td>
@@ -2541,7 +2650,7 @@ function generateReport(){
 function tableFromData(data,title){
   if(!data.length)return`<div class="empty-state">No data for this report</div>`;
   const keys=Object.keys(data[0]);
-  return`<div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:1rem;">${title}</div>
+    return`<div style="font-family:'Space Grotesk',sans-serif;font-weight:700;margin-bottom:1rem;">${title}</div>
   <div style="overflow-x:auto;"><table class="dt"><thead><tr>${keys.map(k=>`<th>${k}</th>`).join('')}</tr></thead><tbody>
   ${data.map(row=>`<tr>${keys.map(k=>`<td>${row[k]}</td>`).join('')}</tr>`).join('')}
   </tbody></table></div>`;
