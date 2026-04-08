@@ -1160,20 +1160,56 @@
   </div>
 </div>
 
-      <!-- Security -->
-      <div id="set-security" style="display:none;">
-        <div class="grid2">
-          <div class="panel panel-body">
-            <div class="fg"><label class="fl">Session Timeout (min)</label><input class="fc" type="number" id="sesTimeout" value="30"></div>
-            <div class="fg"><label class="fl">Max Login Attempts</label><input class="fc" type="number" id="maxLogin" value="5"></div>
-            <div class="fg"><label class="fl">Password Min Length</label><input class="fc" type="number" id="pwdLen" value="8"></div>
-            <hr class="div">
-            <div class="sw-row"><div class="sw-info"><div class="sw-label">Two-Factor Auth</div></div><label class="sw"><input type="checkbox" id="sw2fa"><span class="sw-sl"></span></label></div>
-            <div class="sw-row"><div class="sw-info"><div class="sw-label">IP Whitelisting</div></div><label class="sw"><input type="checkbox" id="swIp"><span class="sw-sl"></span></label></div>
-            <div class="sw-row"><div class="sw-info"><div class="sw-label">Audit Logging</div><div class="sw-desc">Log all admin actions</div></div><label class="sw"><input type="checkbox" id="swAudit" checked><span class="sw-sl"></span></label></div>
-          </div>
+ <!-- Security -->
+<div id="set-security" style="display:none;">
+  <div class="grid2">
+    <div class="panel panel-body">
+      <div class="fg"><label class="fl">Session Timeout (min)</label><input class="fc" type="number" id="sesTimeout" value="30"></div>
+      <div class="fg"><label class="fl">Max Login Attempts</label><input class="fc" type="number" id="maxLogin" value="5"></div>
+      <div class="fg"><label class="fl">Password Min Length</label><input class="fc" type="number" id="pwdLen" value="8"></div>
+      <hr class="div">
+      <div class="sw-row"><div class="sw-info"><div class="sw-label">Two-Factor Auth</div></div><label class="sw"><input type="checkbox" id="sw2fa"><span class="sw-sl"></span></label></div>
+      <div class="sw-row"><div class="sw-info"><div class="sw-label">IP Whitelisting</div></div><label class="sw"><input type="checkbox" id="swIp"><span class="sw-sl"></span></label></div>
+      <div class="sw-row"><div class="sw-info"><div class="sw-label">Audit Logging</div><div class="sw-desc">Log all admin actions</div></div><label class="sw"><input type="checkbox" id="swAudit" checked><span class="sw-sl"></span></label></div>
+    </div>
+    
+    <!-- Password Change Section -->
+    <div class="panel panel-body">
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;margin-bottom:1rem;color:var(--accent);">
+        <i class="fas fa-key"></i> Change Password
+      </div>
+      
+      <div class="fg">
+        <label class="fl">Current Password</label>
+        <input class="fc" type="password" id="currentPassword" placeholder="Enter current password">
+      </div>
+      
+      <div class="fg">
+        <label class="fl">New Password</label>
+        <input class="fc" type="password" id="newPassword" placeholder="Enter new password">
+        <div style="font-size:0.65rem;color:var(--text3);margin-top:0.25rem;">
+          Password must be at least 8 characters
         </div>
       </div>
+      
+      <div class="fg">
+        <label class="fl">Confirm New Password</label>
+        <input class="fc" type="password" id="confirmPassword" placeholder="Confirm new password">
+      </div>
+      
+      <div style="display:flex;gap:0.75rem;margin-top:0.5rem;">
+        <button class="btn btn-accent btn-sm" id="changePasswordBtn">
+          <i class="fas fa-save"></i> Change Password
+        </button>
+        <button class="btn btn-outline btn-sm" id="resetPasswordLinkBtn">
+          <i class="fas fa-envelope"></i> Send Reset Link
+        </button>
+      </div>
+      
+      <div id="passwordStrength" style="margin-top:0.75rem;font-size:0.7rem;"></div>
+    </div>
+  </div>
+</div>
 
       <!-- Appearance -->
       <div id="set-appearance" style="display:none;">
@@ -1323,31 +1359,58 @@
         </div>
       </div>
 
-      <div id="pmEdit" style="padding:1.25rem 1.5rem;">
-        <div class="frow3">
-          <div class="fg"><label class="fl">Full Name</label><input class="fc" id="pmFName"></div>
-          <div class="fg"><label class="fl">Email</label><input class="fc" id="pmEmail" type="email"></div>
-          <div class="fg"><label class="fl">Phone</label><input class="fc" id="pmPhone"></div>
-          <div class="fg"><label class="fl">Role</label><select class="fc" id="pmRole"><option value="admin">Admin</option><option value="manager">Manager</option><option value="worker">Worker</option></select></div>
-          <div class="fg"><label class="fl">Status</label><select class="fc" id="pmStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-          <div class="fg"><label class="fl">Department</label><input class="fc" id="pmDept"></div>
-          <div class="fg"><label class="fl">Employee ID</label><input class="fc" id="pmEmpId" placeholder="EMP-0001"></div>
-          <div class="fg"><label class="fl">ID Card Number</label><input class="fc" id="pmIdNum" placeholder="NX-ADM-001"></div>
-          <div class="fg"><label class="fl">National ID / Passport</label><input class="fc" id="pmNatId"></div>
-          <div class="fg"><label class="fl">Date of Birth</label><input class="fc" id="pmDob" type="date"></div>
-          <div class="fg"><label class="fl">Date Hired</label><input class="fc" id="pmHired" type="date"></div>
-          <div class="fg"><label class="fl">Salary (USD)</label><input class="fc" id="pmSalary" type="number" placeholder="0"></div>
-        </div>
-        <div class="fg"><label class="fl">Address</label><input class="fc" id="pmAddr"></div>
-        <div class="fg"><label class="fl">Emergency Contact</label><input class="fc" id="pmEmerg" placeholder="Name — Phone"></div>
-        <div class="fg"><label class="fl">Bio / Notes</label><textarea class="fc" id="pmBio" rows="3"></textarea></div>
-        <hr class="div">
-        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;margin-bottom:0.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Avatar Color</div>
-        <div class="avatar-options" id="avColorOpts"></div>
-        <div class="fg" style="margin-top:1rem;"><label class="fl">Or Upload Photo</label>
-          <div class="file-drop" id="avUploadDrop"><i class="fas fa-camera" style="color:var(--accent);margin-right:0.5rem;"></i>Click to upload profile photo</div>
-        </div>
+ <div id="pmEdit" style="padding:1.25rem 1.5rem;">
+  <div class="frow3">
+    <div class="fg"><label class="fl">Full Name</label><input class="fc" id="pmFName"></div>
+    <div class="fg"><label class="fl">Email</label><input class="fc" id="pmEmail" type="email"></div>
+    <div class="fg"><label class="fl">Phone</label><input class="fc" id="pmPhone"></div>
+    <div class="fg"><label class="fl">Role</label><select class="fc" id="pmRole"><option value="admin">Admin</option><option value="manager">Manager</option><option value="worker">Worker</option></select></div>
+    <div class="fg"><label class="fl">Status</label><select class="fc" id="pmStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+    <div class="fg"><label class="fl">Department</label><input class="fc" id="pmDept"></div>
+    <div class="fg"><label class="fl">Employee ID</label><input class="fc" id="pmEmpId" placeholder="EMP-0001"></div>
+    <div class="fg"><label class="fl">ID Card Number</label><input class="fc" id="pmIdNum" placeholder="NX-ADM-001"></div>
+    <div class="fg"><label class="fl">National ID / Passport</label><input class="fc" id="pmNatId"></div>
+    <div class="fg"><label class="fl">Date of Birth</label><input class="fc" id="pmDob" type="date"></div>
+    <div class="fg"><label class="fl">Date Hired</label><input class="fc" id="pmHired" type="date"></div>
+    <div class="fg"><label class="fl">Salary (USD)</label><input class="fc" id="pmSalary" type="number" placeholder="0"></div>
+  </div>
+  <div class="fg"><label class="fl">Address</label><input class="fc" id="pmAddr"></div>
+  <div class="fg"><label class="fl">Emergency Contact</label><input class="fc" id="pmEmerg" placeholder="Name — Phone"></div>
+  <div class="fg"><label class="fl">Bio / Notes</label><textarea class="fc" id="pmBio" rows="3"></textarea></div>
+  
+  <!-- PASSWORD CHANGE SECTION -->
+  <hr class="div">
+  <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;margin:0.75rem 0;color:var(--accent);">
+    <i class="fas fa-key"></i> Password Management
+  </div>
+  
+  <div class="frow3">
+    <div class="fg">
+      <label class="fl">New Password</label>
+      <input class="fc" type="password" id="pmNewPassword" placeholder="Enter new password">
+      <div style="font-size:0.65rem;color:var(--text3);margin-top:0.25rem;">
+        Leave blank to keep current password
       </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Confirm Password</label>
+      <input class="fc" type="password" id="pmConfirmPassword" placeholder="Confirm new password">
+    </div>
+    <div class="fg" style="display:flex;align-content: center;">
+      <button class="btn btn-outline btn-sm" id="pmSendResetLink" style="width:100%;">
+        <i class="fas fa-envelope"></i> Send Reset Link
+      </button>
+    </div>
+  </div>
+  <div id="pmPasswordStrength" style="margin-top:0.5rem;font-size:0.7rem;"></div>
+  
+  <hr class="div">
+  <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;margin-bottom:0.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Avatar Color</div>
+  <div class="avatar-options" id="avColorOpts"></div>
+  <div class="fg" style="margin-top:1rem;"><label class="fl">Or Upload Photo</label>
+    <div class="file-drop" id="avUploadDrop"><i class="fas fa-camera" style="color:var(--accent);margin-right:0.5rem;"></i>Click to upload profile photo</div>
+  </div>
+</div>
 
 <div id="pmPerf" style="display:none;padding:1.25rem 1.5rem;">
   <div class="grid3" style="margin-bottom:1.2rem;">
