@@ -893,6 +893,11 @@ function openProfileModal(userId=null, tab='pmEdit') {
   $('pmAddr').value   = user.addr;
   $('pmEmerg').value  = user.emerg;
   $('pmBio').value    = user.bio;
+  
+  // Clear password fields
+  if ($('pmNewPassword')) $('pmNewPassword').value = '';
+  if ($('pmConfirmPassword')) $('pmConfirmPassword').value = '';
+  if ($('pmPasswordStrength')) $('pmPasswordStrength').innerHTML = '';
 
   /* Avatar */
   const avInit = $('pmAvInit'), avImg = $('pmAvImg');
@@ -924,6 +929,16 @@ function openProfileModal(userId=null, tab='pmEdit') {
   /* Avatar upload */
   $('avUploadDrop')?.addEventListener('click', () => $('avatarFileInput').click());
   $('avatarFileInput').onchange = e => handleAvatarUpload(e, userId);
+  
+  /* Password strength checker */
+  if ($('pmNewPassword')) {
+    $('pmNewPassword').addEventListener('input', checkPMPasswordStrength);
+  }
+  
+  /* Send reset link button */
+  if ($('pmSendResetLink')) {
+    $('pmSendResetLink').onclick = () => sendPasswordResetLinkToUser(userId || currentUser.id);
+  }
 
   openM('profileModal');
 }
@@ -955,6 +970,101 @@ function handleAvatarUpload(e, userId) {
   reader.readAsDataURL(file);
 }
 
+// Check password strength in profile modal
+function checkPMPasswordStrength() {
+  const password = $('pmNewPassword')?.value || '';
+  const strengthEl = $('pmPasswordStrength');
+  
+  if (!strengthEl) return;
+  
+  if (password.length === 0) {
+    strengthEl.innerHTML = '';
+    return;
+  }
+  
+  let strength = 0;
+  let message = '';
+  let color = '';
+  
+  // Length check
+  if (password.length >= 8) strength++;
+  if (password.length >= 12) strength++;
+  
+  // Contains number
+  if (/\d/.test(password)) strength++;
+  
+  // Contains uppercase
+  if (/[A-Z]/.test(password)) strength++;
+  
+  // Contains lowercase
+  if (/[a-z]/.test(password)) strength++;
+  
+  // Contains special character
+  if (/[^A-Za-z0-9]/.test(password)) strength++;
+  
+  // Determine strength
+  if (strength <= 2) {
+    message = 'Weak password';
+    color = '#f87171';
+  } else if (strength <= 4) {
+    message = 'Medium password';
+    color = '#f97316';
+  } else {
+    message = 'Strong password';
+    color = '#34d399';
+  }
+  
+  strengthEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <div style="flex:1;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;">
+        <div style="width:${(strength / 6) * 100}%;height:100%;background:${color};border-radius:2px;"></div>
+      </div>
+      <span style="color:${color};">${message}</span>
+    </div>
+  `;
+}
+
+// Send password reset link to a specific user
+function sendPasswordResetLinkToUser(userId) {
+  const user = userById(userId);
+  
+  if (!user || !user.email) {
+    toast('No email address found for this user', 'error');
+    return;
+  }
+  
+  // Generate reset token
+  const resetToken = generateResetToken();
+  const resetLink = `${window.location.origin}/reset-password?token=${resetToken}&user=${userId}`;
+  
+  // Store reset token
+  if (!DB.passwordResetTokens) DB.passwordResetTokens = {};
+  DB.passwordResetTokens[resetToken] = {
+    email: user.email,
+    userId: userId,
+    expires: Date.now() + 3600000 // 1 hour expiry
+  };
+  
+  // Send email with reset link
+  sendEmail(
+    user.email,
+    'Password Reset Request',
+    'password_reset'
+  );
+  
+  // Log for demo
+  console.log(`Password reset link for ${user.name}:`, resetLink);
+  
+  toast(`Password reset link sent to ${user.email}`, 'success');
+  logAction('request', 'Password Reset', `Reset link sent to ${user.name} (${user.email})`);
+}
+
+// Generate a random reset token
+function generateResetToken() {
+  return Math.random().toString(36).substring(2, 15) + 
+         Math.random().toString(36).substring(2, 15);
+}
+
 function savePMUser(userId) {
   const data = {
     name:$('pmFName').value.trim(), email:$('pmEmail').value.trim(), phone:$('pmPhone').value.trim(),
@@ -968,15 +1078,42 @@ function savePMUser(userId) {
   /* Avatar color */
   const selColor = document.querySelector('#avColorOpts .av-color-opt.sel');
   if (selColor) data.avatarColor = selColor.dataset.color;
+  
+  /* Password change */
+  const newPassword = $('pmNewPassword')?.value;
+  const confirmPassword = $('pmConfirmPassword')?.value;
+  
+  if (newPassword || confirmPassword) {
+    if (newPassword !== confirmPassword) {
+      toast('Passwords do not match', 'error');
+      return;
+    }
+    const minLength = DB.settings?.passwordMinLen || 8;
+    if (newPassword.length < minLength) {
+      toast(`Password must be at least ${minLength} characters`, 'error');
+      return;
+    }
+    data.password = newPassword;
+  }
 
   if (userId) {
     const u = userById(userId);
     Object.assign(u, data);
+    // Store password separately if changed
+    if (data.password) {
+      if (!DB.userPasswords) DB.userPasswords = {};
+      DB.userPasswords[userId] = data.password;
+    }
     logAction('update',`User #${userId}`,`Updated ${data.name}`);
     toast('Profile saved','success');
   } else {
     const newUser = { id:generateId('users'), ...data, avatarImg:'', avatarColor: data.avatarColor||'#eab308', lastLogin:'Never', registered:nowStr().slice(0,10), online:'offline' };
     DB.users.push(newUser);
+    // Store password for new user
+    if (data.password) {
+      if (!DB.userPasswords) DB.userPasswords = {};
+      DB.userPasswords[newUser.id] = data.password;
+    }
     logAction('create',`User #${newUser.id}`,`Created ${data.name}`);
     toast('User created','success');
   }
@@ -3011,6 +3148,7 @@ function renderEmailTemplates() {
     { id: 'incident_alert', name: 'Critical Incident', desc: 'Sent on critical safety incident.' },
     { id: 'doc_request', name: 'Document Request', desc: 'Sent to request missing documents.' },
     { id: 'ticket_update', name: 'Ticket Update', desc: 'Sent when a ticket status changes.' },
+    { id: 'password_reset', name: 'Password Reset', desc: 'Sent when user requests password reset.' } // Added
   ];
   
   $('emailTemplatesList').innerHTML = templates.map(t => `
@@ -4104,6 +4242,11 @@ function wireSettingsEvents() {
     const position = $('currencyPosition').value;
     updateCurrencyPreview(currency, position);
   });
+  
+  // Password change events
+  $('changePasswordBtn')?.addEventListener('click', changePassword);
+  $('resetPasswordLinkBtn')?.addEventListener('click', sendPasswordResetLink);
+  $('newPassword')?.addEventListener('input', checkPasswordStrength);
 }
 
 function saveSettings() {
@@ -4255,7 +4398,9 @@ function fmtMoneyWithSettings(amount) {
 }
 
 // Override the global fmtMoney function
-const originalFmtMoney = fmtMoney;
+if (typeof originalFmtMoney === 'undefined') {
+  var originalFmtMoney = fmtMoney;
+}
 window.fmtMoney = fmtMoneyWithSettings;
 
 function setAccentColor(color) {
@@ -4273,6 +4418,152 @@ function updateTplPreview() {
     payslip: `<div style="padding:0.5rem;"><strong style="color:var(--accent);">Subject:</strong> Your Payslip is Ready<br><br>Dear <strong>{name}</strong>,<br><br>Your payslip for <strong>{period}</strong> is ready.<br>Net Pay: <strong>{net_pay}</strong><br><br>Please log in to download.<br><br>Payroll Team</div>`,
   };
   if ($('tplPreviewBox')) $('tplPreviewBox').innerHTML = previews[type] || 'Select a template';
+}
+
+// ========== PASSWORD MANAGEMENT FUNCTIONS ==========
+
+// Function to change password
+function changePassword() {
+  const currentPassword = $('currentPassword')?.value;
+  const newPassword = $('newPassword')?.value;
+  const confirmPassword = $('confirmPassword')?.value;
+  
+  // Validation
+  if (!currentPassword) {
+    toast('Please enter current password', 'error');
+    return;
+  }
+  
+  if (!newPassword) {
+    toast('Please enter new password', 'error');
+    return;
+  }
+  
+  const minLength = DB.settings.passwordMinLen || 8;
+  if (newPassword.length < minLength) {
+    toast(`Password must be at least ${minLength} characters`, 'error');
+    return;
+  }
+  
+  if (newPassword !== confirmPassword) {
+    toast('New passwords do not match', 'error');
+    return;
+  }
+  
+  // In a real app, you would verify current password against stored hash
+  // For demo, we'll check against a stored password
+  const storedPassword = DB.settings.userPassword || 'admin123';
+  
+  if (currentPassword !== storedPassword) {
+    toast('Current password is incorrect', 'error');
+    return;
+  }
+  
+  // Update password (in real app, hash and store)
+  DB.settings.userPassword = newPassword;
+  logAction('update', 'Password', `${currentUser?.name || 'User'} changed their password`);
+  
+  // Clear fields
+  $('currentPassword').value = '';
+  $('newPassword').value = '';
+  $('confirmPassword').value = '';
+  $('passwordStrength').innerHTML = '';
+  
+  toast('Password changed successfully', 'success');
+}
+
+// Function to send password reset link
+function sendPasswordResetLink() {
+  const userEmail = currentUser?.email || DB.settings.companyEmail;
+  
+  if (!userEmail) {
+    toast('No email address found', 'error');
+    return;
+  }
+  
+  // Generate reset token (in real app, store in DB with expiry)
+  const resetToken = generateResetToken();
+  const resetLink = `${window.location.origin}/reset-password?token=${resetToken}`;
+  
+  // Store reset token (for demo purposes)
+  if (!DB.passwordResetTokens) DB.passwordResetTokens = {};
+  DB.passwordResetTokens[resetToken] = {
+    email: userEmail,
+    expires: Date.now() + 3600000 // 1 hour expiry
+  };
+  
+  // Send email with reset link
+  sendEmail(
+    userEmail,
+    'Password Reset Request',
+    'password_reset'
+  );
+  
+  // Also log the reset link for demo purposes
+  console.log('Password reset link (demo):', resetLink);
+  
+  toast(`Password reset link sent to ${userEmail}`, 'success');
+  logAction('request', 'Password Reset', `Reset link sent to ${userEmail}`);
+}
+
+// Generate a random reset token
+function generateResetToken() {
+  return Math.random().toString(36).substring(2, 15) + 
+         Math.random().toString(36).substring(2, 15);
+}
+
+// Check password strength
+function checkPasswordStrength() {
+  const password = $('newPassword')?.value || '';
+  const strengthEl = $('passwordStrength');
+  
+  if (!strengthEl) return;
+  
+  if (password.length === 0) {
+    strengthEl.innerHTML = '';
+    return;
+  }
+  
+  let strength = 0;
+  let message = '';
+  let color = '';
+  
+  // Length check
+  if (password.length >= 8) strength++;
+  if (password.length >= 12) strength++;
+  
+  // Contains number
+  if (/\d/.test(password)) strength++;
+  
+  // Contains uppercase
+  if (/[A-Z]/.test(password)) strength++;
+  
+  // Contains lowercase
+  if (/[a-z]/.test(password)) strength++;
+  
+  // Contains special character
+  if (/[^A-Za-z0-9]/.test(password)) strength++;
+  
+  // Determine strength
+  if (strength <= 2) {
+    message = 'Weak password';
+    color = '#f87171';
+  } else if (strength <= 4) {
+    message = 'Medium password';
+    color = '#f97316';
+  } else {
+    message = 'Strong password';
+    color = '#34d399';
+  }
+  
+  strengthEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <div style="flex:1;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;">
+        <div style="width:${(strength / 6) * 100}%;height:100%;background:${color};border-radius:2px;"></div>
+      </div>
+      <span style="color:${color};">${message}</span>
+    </div>
+  `;
 }
 
 /* ============================================================
